@@ -289,14 +289,17 @@ def parte_1(story):
         [_cell('Aspecto', C_ACCENT, bold=True),
          _cell('PSeInt (escritorio)', C_ACCENT, bold=True),
          _cell('PseudoWeb (navegador)', C_ACCENT, bold=True)],
-        [_cell('Instalación'), _cell('Sí (Win/macOS/Linux)'), _cell('No: doble clic en HTML')],
+        [_cell('Instalación'), _cell('Sí (Win/macOS/Linux)'), _cell('No: doble clic en HTML o URL pública')],
         [_cell('Sintaxis'), _cell('Pseudocódigo PSeInt'), _cell('Compatible PSeInt (con limitaciones)')],
-        [_cell('Diagrama de flujo'), _cell('Sí, automático'), _cell('No (pendiente)')],
+        [_cell('Resaltado de sintaxis'), _cell('Sí'), _cell('Sí (CodeMirror 6, con números de línea)')],
+        [_cell('Diagrama de flujo'), _cell('Sí, automático'), _cell('Sí, automático (botón 📊 Diagrama, Mermaid)')],
         [_cell('Depurador paso a paso'), _cell('Sí'), _cell('No (pendiente)')],
-        [_cell('Funciones definidas por el usuario'), _cell('Sí'), _cell('No (solo built-in)')],
+        [_cell('Funciones definidas por el usuario'), _cell('Sí'), _cell('No (solo 19 funciones built-in)')],
         [_cell('Exportar a C++ y otros lenguajes'), _cell('Sí'), _cell('No')],
         [_cell('Sistema de ejercicios corregidos'), _cell('No nativo'), _cell('Sí: 36 ejercicios, nota 0-10')],
-        [_cell('Autoguardado'), _cell('Manual'), _cell('Automático en localStorage')],
+        [_cell('Autoguardado del editor'), _cell('Manual'), _cell('Automático en localStorage')],
+        [_cell('Compartir programa por URL'), _cell('No'), _cell('Sí (botón 🔗 Compartir, hash con base64)')],
+        [_cell('Versión online accesible sin descargar'), _cell('No'), _cell('Sí (GitHub Pages)')],
     ]
     story.append(color_table(diffs, [4.2*cm, 6*cm, 6.3*cm]))
     story.append(P(
