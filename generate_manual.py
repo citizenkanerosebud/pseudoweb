@@ -5,6 +5,7 @@ Manual de PSeInt + PseudoWeb centrado en los 36 ejercicios.
 Lee los enunciados directamente de exercises.js (sin duplicar datos).
 """
 
+import math
 import re
 import datetime
 from pathlib import Path
@@ -18,6 +19,7 @@ from reportlab.platypus import (
     PageBreak, HRFlowable, KeepTogether
 )
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
+from reportlab.graphics.shapes import Drawing, Rect, Polygon, String, Line, Circle
 
 
 # ── Paleta (mismo dark theme que la app: indigo + ámbar) ────────────────────
@@ -43,13 +45,14 @@ def S(name, **kw): return ParagraphStyle(name, parent=BASE['Normal'], **kw)
 H1   = S('H1',   fontSize=22, textColor=C_ACCENT,  fontName='Helvetica-Bold', spaceAfter=12, spaceBefore=18, leading=28)
 H2   = S('H2',   fontSize=15, textColor=C_ACCENT2, fontName='Helvetica-Bold', spaceAfter=8,  spaceBefore=14, leading=20)
 H3   = S('H3',   fontSize=11, textColor=C_OK,      fontName='Helvetica-Bold', spaceAfter=4,  spaceBefore=10, leading=15)
+H4   = S('H4',   fontSize=10, textColor=C_INFO,    fontName='Helvetica-Bold', spaceAfter=3,  spaceBefore=8,  leading=14)
 BODY = S('BODY', fontSize=9.5, textColor=C_TEXT, leading=14, alignment=TA_JUSTIFY, spaceAfter=6)
 MONO = S('MONO', fontSize=8.5, textColor=C_ACCENT2, fontName='Courier', leading=11, spaceAfter=4)
 NOTE = S('NOTE', fontSize=8.5, textColor=C_INFO,  leading=12, leftIndent=10, spaceAfter=4, fontName='Helvetica-Oblique')
 WARN = S('WARN', fontSize=8.5, textColor=C_ERR,   leading=12, leftIndent=10, spaceAfter=4, fontName='Helvetica-Oblique')
 
 def P(t, st=BODY): return Paragraph(t, st)
-def H(t, lv=1):    return Paragraph(t, [H1, H2, H3][lv - 1])
+def H(t, lv=1):    return Paragraph(t, [H1, H2, H3, H4][lv - 1])
 def M(t):          return Paragraph(t, MONO)
 def SP(n=8):       return Spacer(1, n)
 def HR():          return HRFlowable(width="100%", thickness=0.5, color=C_MUTED, spaceAfter=8)
@@ -143,7 +146,7 @@ def cover_page(story):
     story.append(HRFlowable(width='60%', thickness=1, color=C_ACCENT, hAlign='CENTER', spaceAfter=20))
     story.append(SP(40))
     table_data = [
-        [_cell('Versión', C_ACCENT, bold=True),  _cell('PseudoWeb v0.6')],
+        [_cell('Versión', C_ACCENT, bold=True),  _cell('PseudoWeb v0.8 (sintaxis resaltada con CodeMirror)')],
         [_cell('Fecha',   C_ACCENT, bold=True),  _cell(datetime.date.today().strftime('%d / %m / %Y'))],
         [_cell('Idioma',  C_ACCENT, bold=True),  _cell('Español')],
         [_cell('Soporta', C_ACCENT, bold=True),  _cell('Linux · macOS · Windows (vía PSeInt) + cualquier navegador moderno (PseudoWeb)')],
@@ -161,6 +164,12 @@ def toc_page(story):
     story.append(H('Índice de contenidos'))
     story.append(SP(6))
     toc = [
+        ('EMPEZAR DESDE CERO', 'Aprende a programar (para iniciarse)'),
+        ('  Capítulo 1', '¿Qué es programar? Algoritmo, pseudocódigo y diagrama de flujo'),
+        ('  Capítulo 2', 'Las cinco formas del diagrama de flujo'),
+        ('  Capítulo 3', 'Las once instrucciones, una a una (con ejemplos y diagramas)'),
+        ('  Capítulo 4', 'Tu primer programa completo: ¿Es par o impar?'),
+        ('', ''),
         ('PARTE I', 'Sobre PSeInt y PseudoWeb'),
         ('  §1.1', '¿Qué es PSeInt? Descarga oficial para Windows / macOS / Linux'),
         ('  §1.2', '¿Qué es PseudoWeb? Diferencias y ventajas'),
@@ -463,6 +472,737 @@ def _code_block(code):
     return KeepTogether([t, SP(6)])
 
 
+# ── Helpers de dibujo de diagramas de flujo ──────────────────────────────────
+def make_drawing(w, h):
+    """Drawing con fondo oscuro a juego con el tema."""
+    d = Drawing(w, h)
+    d.add(Rect(0, 0, w, h, fillColor=C_BG, strokeColor=None))
+    return d
+
+
+def _label_in(d, cx, cy, text, color=None, size=8.5, bold=False):
+    font = 'Helvetica-Bold' if bold else 'Helvetica'
+    d.add(String(cx, cy - size / 3, text,
+                 fontName=font, fontSize=size,
+                 fillColor=color or C_TEXT, textAnchor='middle'))
+
+
+def _label_side(d, x, y, text, color=None, size=8, bold=True, anchor='start'):
+    font = 'Helvetica-Bold' if bold else 'Helvetica'
+    d.add(String(x, y, text,
+                 fontName=font, fontSize=size,
+                 fillColor=color or C_ACCENT2, textAnchor=anchor))
+
+
+def oval_shape(d, cx, cy, w, h, text, fill=None, txt_color=None):
+    """Óvalo (rectángulo redondeado) para Inicio / Fin."""
+    fill = fill if fill is not None else C_ACCENT
+    txt_color = txt_color if txt_color is not None else C_BG
+    d.add(Rect(cx - w / 2, cy - h / 2, w, h, rx=h / 2, ry=h / 2,
+               fillColor=fill, strokeColor=fill))
+    _label_in(d, cx, cy, text, color=txt_color, size=9, bold=True)
+
+
+def rect_shape(d, cx, cy, w, h, text, fill=None, border=None, txt_color=None):
+    """Rectángulo para asignaciones, Definir, Dimension..."""
+    fill = fill if fill is not None else C_SURFACE2
+    border = border if border is not None else C_MUTED
+    txt_color = txt_color if txt_color is not None else C_TEXT
+    d.add(Rect(cx - w / 2, cy - h / 2, w, h,
+               fillColor=fill, strokeColor=border, strokeWidth=1))
+    _label_in(d, cx, cy, text, color=txt_color, size=8.5)
+
+
+def io_shape(d, cx, cy, w, h, text, fill=None, txt_color=None):
+    """Paralelogramo para Escribir / Leer (entrada/salida)."""
+    fill = fill if fill is not None else C_ACCENT2
+    txt_color = txt_color if txt_color is not None else C_BG
+    skew = h * 0.4
+    pts = [
+        cx - w / 2 + skew, cy - h / 2,
+        cx + w / 2,        cy - h / 2,
+        cx + w / 2 - skew, cy + h / 2,
+        cx - w / 2,        cy + h / 2,
+    ]
+    d.add(Polygon(points=pts, fillColor=fill, strokeColor=fill))
+    _label_in(d, cx, cy, text, color=txt_color, size=8.5, bold=True)
+
+
+def diamond_shape(d, cx, cy, w, h, text, fill=None, border=None, txt_color=None):
+    """Rombo para condiciones (Si, Mientras, ...)."""
+    fill = fill if fill is not None else C_BG
+    border = border if border is not None else C_ACCENT2
+    txt_color = txt_color if txt_color is not None else C_ACCENT2
+    pts = [cx, cy + h / 2, cx + w / 2, cy, cx, cy - h / 2, cx - w / 2, cy]
+    d.add(Polygon(points=pts, fillColor=fill, strokeColor=border, strokeWidth=1.5))
+    _label_in(d, cx, cy, text, color=txt_color, size=8.5, bold=True)
+
+
+def junction(d, cx, cy, r=4):
+    """Punto de unión pequeño."""
+    d.add(Circle(cx, cy, r, fillColor=C_MUTED, strokeColor=C_MUTED))
+
+
+def arrow_line(d, x1, y1, x2, y2, label=None, label_offset=(8, 4), color=None):
+    """Línea con flecha al final, con etiqueta opcional."""
+    color = color if color is not None else C_MUTED
+    d.add(Line(x1, y1, x2, y2, strokeColor=color, strokeWidth=1.3))
+    dx = x2 - x1
+    dy = y2 - y1
+    if dx == 0 and dy == 0:
+        return
+    ang = math.atan2(dy, dx)
+    L = 8
+    hx1 = x2 - L * math.cos(ang - 0.4)
+    hy1 = y2 - L * math.sin(ang - 0.4)
+    hx2 = x2 - L * math.cos(ang + 0.4)
+    hy2 = y2 - L * math.sin(ang + 0.4)
+    d.add(Polygon(points=[x2, y2, hx1, hy1, hx2, hy2],
+                  fillColor=color, strokeColor=color))
+    if label:
+        ox, oy = label_offset
+        d.add(String((x1 + x2) / 2 + ox, (y1 + y2) / 2 + oy, label,
+                     fontName='Helvetica-Bold', fontSize=8,
+                     fillColor=C_ACCENT2, textAnchor='start'))
+
+
+def arrow_corner(d, x1, y1, x2, y2, label=None, label_offset=(6, 4), color=None):
+    """Flecha en forma de L (sale en horizontal y baja en vertical, o viceversa)."""
+    color = color if color is not None else C_MUTED
+    # Esquina: primero horizontal, luego vertical
+    d.add(Line(x1, y1, x2, y1, strokeColor=color, strokeWidth=1.3))
+    d.add(Line(x2, y1, x2, y2, strokeColor=color, strokeWidth=1.3))
+    # Flecha al final apuntando hacia abajo (o arriba si y2>y1)
+    going_down = y2 < y1
+    L = 7
+    if going_down:
+        d.add(Polygon(points=[x2, y2, x2 - 3, y2 + L, x2 + 3, y2 + L],
+                      fillColor=color, strokeColor=color))
+    else:
+        d.add(Polygon(points=[x2, y2, x2 - 3, y2 - L, x2 + 3, y2 - L],
+                      fillColor=color, strokeColor=color))
+    if label:
+        ox, oy = label_offset
+        d.add(String(x1 + (x2 - x1) / 2 + ox, y1 + oy, label,
+                     fontName='Helvetica-Bold', fontSize=8,
+                     fillColor=C_ACCENT2, textAnchor='start'))
+
+
+# ── Sección didáctica (EMPEZAR DESDE CERO) ───────────────────────────────────
+def parte_didactica(story):
+    story.append(H('EMPEZAR DESDE CERO — Aprende a programar'))
+    story.append(HR())
+    cap_introduccion(story)
+    cap_formas_basicas(story)
+    cap_instrucciones(story)
+    cap_programa_completo(story)
+
+
+# ── Capítulo 1 ───────────────────────────────────────────────────────────────
+def cap_introduccion(story):
+    story.append(H('Capítulo 1 — ¿Qué es programar?', 2))
+    story.append(P(
+        'Un <b>programa</b> es una lista de pasos que el ordenador sigue, uno detrás de otro, '
+        'sin equivocarse y a toda velocidad. Tú lo escribes con palabras (en este caso, en español) '
+        'y el ordenador lo obedece al pie de la letra.'
+    ))
+    story.append(P(
+        'Imagínate una receta de cocina: "1) coge los huevos, 2) cáscalos en un cuenco, 3) bátelos…". '
+        'Un programa es eso, pero en lugar de manejar huevos, maneja <i>datos</i> (números, palabras, '
+        'sí o no…).'
+    ))
+    story.append(H('¿Qué es un algoritmo?', 3))
+    story.append(P(
+        'Antes de escribir el programa, los programadores piensan el <b>algoritmo</b>: la idea general, '
+        'el plan. El algoritmo no depende de ningún ordenador concreto — es la receta. El programa es '
+        'esa receta escrita en un idioma que el ordenador entiende.'
+    ))
+    story.append(H('¿Y el pseudocódigo?', 3))
+    story.append(P(
+        'El <b>pseudocódigo</b> es un idioma a medio camino: usa palabras en español, pero con reglas '
+        'fijas para que sea claro. Es perfecto para aprender, porque te concentras en el <i>pensamiento</i> '
+        'sin pelearte con la sintaxis difícil de un lenguaje "de verdad" (como Python, Java o C).'
+    ))
+    story.append(H('¿Y el diagrama de flujo?', 3))
+    story.append(P(
+        'El <b>diagrama de flujo</b> es el mismo programa pero dibujado. En vez de leer líneas de texto, '
+        'sigues flechas que conectan formas: óvalos, rectángulos, paralelogramos y rombos. Cada forma '
+        'representa una cosa distinta. En el siguiente capítulo verás las cinco formas que se usan.'
+    ))
+    story.append(P(
+        'En PseudoWeb puedes escribir tu pseudocódigo y pulsar <b>📊 Diagrama</b> para ver el diagrama '
+        'de flujo correspondiente. Y al revés: si entiendes el diagrama, ya casi tienes el programa.',
+        NOTE
+    ))
+    story.append(PageBreak())
+
+
+# ── Capítulo 2 ───────────────────────────────────────────────────────────────
+def cap_formas_basicas(story):
+    story.append(H('Capítulo 2 — Las cinco formas del diagrama de flujo', 2))
+    story.append(P(
+        'Casi cualquier programa se dibuja combinando estas cinco formas. Apréndete su significado y '
+        'serás capaz de "leer" cualquier diagrama, por complicado que parezca.'
+    ))
+    story.append(SP(8))
+
+    # Tabla con las 5 formas (forma a la izquierda, descripción a la derecha)
+    def shape_cell(kind):
+        d = make_drawing(95, 50)   # encaja en la columna de 3.6 cm (~102 pt)
+        if kind == 'oval':
+            oval_shape(d, 47, 25, 80, 22, 'Inicio')
+        elif kind == 'rect':
+            rect_shape(d, 47, 25, 80, 22, 'x ← 5')
+        elif kind == 'io':
+            io_shape(d, 47, 25, 80, 22, 'Leer x')
+        elif kind == 'diamond':
+            diamond_shape(d, 47, 25, 80, 30, '¿x > 5?')
+        elif kind == 'arrow':
+            arrow_line(d, 10, 25, 85, 25)
+        return d
+
+    rows = [
+        [shape_cell('oval'),    P('<b>Óvalo</b> — Marca el <b>INICIO</b> y el <b>FIN</b> del programa. '
+                                  'Cada diagrama empieza con un óvalo "Inicio" y termina con otro "Fin".', BODY)],
+        [shape_cell('rect'),    P('<b>Rectángulo</b> — Una <b>operación</b>: una asignación, un cálculo, '
+                                  'declarar variables, reservar un array con <font face="Courier">Dimension</font>...', BODY)],
+        [shape_cell('io'),      P('<b>Paralelogramo</b> — <b>Entrada o salida</b> de datos. Lo usas para '
+                                  '<font face="Courier">Escribir</font> (mostrar algo) o '
+                                  '<font face="Courier">Leer</font> (pedir un dato al usuario).', BODY)],
+        [shape_cell('diamond'), P('<b>Rombo</b> — Una <b>decisión</b>. Se evalúa una pregunta de sí/no '
+                                  '(o de varios valores en el caso de <font face="Courier">Segun</font>) y se '
+                                  'sale por la flecha que corresponda.', BODY)],
+        [shape_cell('arrow'),   P('<b>Flecha</b> — Indica <b>hacia dónde va</b> la ejecución. El programa '
+                                  'siempre sigue las flechas. A veces llevan etiqueta ("Sí", "No", un valor...) '
+                                  'para indicar bajo qué condición se toma ese camino.', BODY)],
+    ]
+    t = Table(rows, colWidths=[3.6 * cm, 13 * cm])
+    t.setStyle(TableStyle([
+        ('VALIGN',         (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING',    (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING',   (0, 0), (-1, -1), 6),
+        ('TOPPADDING',     (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING',  (0, 0), (-1, -1), 8),
+        ('LINEBELOW',      (0, 0), (-1, -2), 0.3, C_BORDER),
+    ]))
+    story.append(t)
+    story.append(SP(10))
+    story.append(P(
+        'Además, los diagramas suelen llevar pequeños <b>puntos de unión</b> (círculos rellenos) donde '
+        'dos o más flechas se vuelven a juntar tras una decisión. No representan ninguna instrucción, '
+        'sólo marcan que la ejecución se "reunifica".',
+        NOTE
+    ))
+    story.append(PageBreak())
+
+
+# ── Capítulo 3 — Las once instrucciones, una a una ───────────────────────────
+def cap_instrucciones(story):
+    story.append(H('Capítulo 3 — Las once instrucciones, una a una', 2))
+    story.append(P(
+        'A continuación tienes cada instrucción explicada con un ejemplo y, cuando aporta, su trozo de '
+        'diagrama de flujo. Léelas en orden la primera vez; después puedes consultarlas sueltas.'
+    ))
+    story.append(SP(6))
+    instr_proceso(story)
+    instr_definir(story)
+    instr_asignar(story)
+    instr_escribir(story)
+    instr_leer(story)
+    instr_si(story)
+    instr_segun(story)
+    instr_mientras(story)
+    instr_repetir(story)
+    instr_para(story)
+    instr_dimension(story)
+
+
+def _instr_shape(kind, text, w=160, h=44):
+    d = make_drawing(w + 20, h + 16)
+    cx, cy = (w + 20) / 2, (h + 16) / 2
+    if kind == 'oval':
+        oval_shape(d, cx, cy, w, h, text)
+    elif kind == 'rect':
+        rect_shape(d, cx, cy, w, h, text)
+    elif kind == 'io':
+        io_shape(d, cx, cy, w, h, text)
+    return d
+
+
+def instr_proceso(story):
+    story.append(H('3.1   Proceso / FinProceso', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Es la "envoltura" de tu programa. Como cuando empiezas un cuento con '
+        '"Érase una vez…" y lo cierras con "…fin", todo programa empieza con <font face="Courier">'
+        'Proceso</font> y acaba con <font face="Courier">FinProceso</font>. El nombre que pones al '
+        'lado de <font face="Courier">Proceso</font> no afecta — sirve para que tú sepas de qué va el programa.'
+    ))
+    story.append(_code_block('Proceso Saludo\n    Escribir "Hola, mundo"\nFinProceso'))
+    story.append(P('En el diagrama, esto se dibuja con dos óvalos:'))
+    d = make_drawing(420, 120)
+    oval_shape(d, 100, 90, 130, 26, 'Inicio Saludo')
+    io_shape(d, 250, 90, 130, 26, 'Escribir "Hola, mundo"')
+    oval_shape(d, 380, 90, 60, 26, 'Fin')
+    arrow_line(d, 165, 90, 185, 90)
+    arrow_line(d, 315, 90, 350, 90)
+    story.append(d)
+    story.append(P('El programa entra por el óvalo izquierdo, ejecuta lo que hay en medio y sale por el de la derecha.', NOTE))
+    story.append(SP(6))
+
+
+def instr_definir(story):
+    story.append(H('3.2   Definir … Como tipo', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Le dice al ordenador que vas a usar una <b>variable</b> '
+        '(una "caja" con un nombre donde guardar un valor) y de qué <b>tipo</b> es la caja. '
+        'Imagínate cada variable como una etiqueta con un nombre pegada a una caja.'
+    ))
+    tipos_tbl = [
+        [_cell('Tipo', C_ACCENT, bold=True), _cell('Qué admite', C_ACCENT, bold=True), _cell('Ejemplos', C_ACCENT, bold=True)],
+        [_cell('Entero',  bold=True), _cell('Números sin decimales (positivos o negativos, también 0)'), _cell('5, -3, 100, 0', mono=True)],
+        [_cell('Real',    bold=True), _cell('Números con decimales'), _cell('3.14, 2.5, -0.7', mono=True)],
+        [_cell('Cadena',  bold=True), _cell('Texto (entre comillas dobles)'), _cell('"Ana", "Hola!"', mono=True)],
+        [_cell('Logico',  bold=True), _cell('Sólo dos valores'),                _cell('Verdadero, Falso', mono=True)],
+    ]
+    story.append(color_table(tipos_tbl, [2.6 * cm, 8.5 * cm, 5.4 * cm]))
+    story.append(_code_block(
+        'Definir edad Como Entero\n'
+        'Definir nombre Como Cadena\n'
+        'Definir altura Como Real\n'
+        'Definir mayor_de_edad Como Logico\n'
+        '\n'
+        '// Varias del mismo tipo a la vez:\n'
+        'Definir a, b, c Como Entero'
+    ))
+    story.append(P(
+        'En el diagrama, <font face="Courier">Definir</font> es un rectángulo (es una operación):'
+    ))
+    story.append(_instr_shape('rect', 'Definir edad Como Entero', w=200))
+    story.append(SP(6))
+
+
+def instr_asignar(story):
+    story.append(H('3.3   Asignación con  <font face="Courier">&lt;-</font>', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Guardar un valor dentro de una variable. La flecha '
+        '<font face="Courier">&lt;-</font> "apunta hacia donde se guarda": '
+        '<font face="Courier">x &lt;- 5</font> significa "mete 5 dentro de x".'
+    ))
+    story.append(P(
+        '⚠ <b>No confundas</b> <font face="Courier">&lt;-</font> (asignar) con <font face="Courier">=</font> '
+        '(comparar). <font face="Courier">x = 5</font> pregunta "¿x vale 5?"; '
+        '<font face="Courier">x &lt;- 5</font> ordena "guarda 5 en x".',
+        WARN
+    ))
+    story.append(_code_block(
+        'edad <- 16\n'
+        'nombre <- "Ana"\n'
+        'suma <- 3 + 4         // suma vale 7\n'
+        'doble <- edad * 2     // doble vale 32 (si edad era 16)'
+    ))
+    story.append(P('En el diagrama: rectángulo con la asignación dentro.'))
+    story.append(_instr_shape('rect', 'doble ← edad * 2', w=170))
+    story.append(SP(6))
+
+
+def instr_escribir(story):
+    story.append(H('3.4   Escribir', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Muestra algo en la pantalla. Puedes mezclar texto entre comillas y '
+        'nombres de variables, separados por comas.'
+    ))
+    story.append(_code_block(
+        'Escribir "Hola"\n'
+        'Escribir "Tu edad es: ", edad\n'
+        'Escribir nombre, " tiene ", edad, " años"'
+    ))
+    story.append(P('En el diagrama: paralelogramo (forma inclinada) con lo que se va a mostrar.'))
+    story.append(_instr_shape('io', 'Escribir nombre, edad', w=180))
+    story.append(SP(6))
+
+
+def instr_leer(story):
+    story.append(H('3.5   Leer', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Pide al usuario que escriba un valor por el teclado, y lo guarda en '
+        'una variable. Cuando el programa llega a un <font face="Courier">Leer</font>, '
+        '<b>se queda esperando</b> hasta que el usuario teclea algo y pulsa Enter.'
+    ))
+    story.append(_code_block(
+        'Definir edad Como Entero\n'
+        'Escribir "¿Cuántos años tienes?"\n'
+        'Leer edad\n'
+        'Escribir "Tienes ", edad, " años"'
+    ))
+    story.append(P('Misma forma que <font face="Courier">Escribir</font> (paralelogramo), pero con "Leer":'))
+    story.append(_instr_shape('io', 'Leer edad', w=120))
+    story.append(SP(6))
+
+
+def instr_si(story):
+    story.append(H('3.6   Si / SiNo / FinSi   —  decisión simple', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Permite que el programa <b>tome decisiones</b>: si una condición '
+        'se cumple hace una cosa; si no, hace otra. La parte <font face="Courier">SiNo</font> es opcional.'
+    ))
+    story.append(_code_block(
+        'Definir edad Como Entero\n'
+        'Leer edad\n'
+        'Si edad >= 18 Entonces\n'
+        '    Escribir "Mayor de edad"\n'
+        'SiNo\n'
+        '    Escribir "Menor de edad"\n'
+        'FinSi'
+    ))
+
+    story.append(H('Operadores que puedes usar en la condición', 4))
+    ops_tbl = [
+        [_cell('Operadores de comparación', C_ACCENT, bold=True), _cell('Operadores lógicos', C_ACCENT, bold=True)],
+        [_cell('= igual a            <> distinto de\n< menor que          > mayor que\n<= menor o igual     >= mayor o igual', mono=True, size=8),
+         _cell('Y    cond1 Y cond2   (ambas)\nO    cond1 O cond2   (al menos una)\nNO   NO cond         (lo contrario)', mono=True, size=8)],
+    ]
+    story.append(color_table(ops_tbl, [8 * cm, 8.5 * cm]))
+
+    story.append(H('Diagrama paso a paso', 4))
+    d = make_drawing(440, 220)
+    diamond_shape(d, 220, 180, 130, 50, 'edad ≥ 18')
+    io_shape(d, 100, 95, 140, 28, 'Escribir "Mayor"')
+    io_shape(d, 340, 95, 140, 28, 'Escribir "Menor"')
+    junction(d, 220, 30)
+    # Flechas
+    arrow_line(d, 175, 162, 110, 112, label='Sí', label_offset=(-22, 8))
+    arrow_line(d, 265, 162, 330, 112, label='No', label_offset=(8, 8))
+    arrow_line(d, 100, 81, 215, 35)
+    arrow_line(d, 340, 81, 225, 35)
+    story.append(d)
+    story.append(P(
+        '<b>Cómo se lee:</b>'
+    ))
+    pasos_si = [
+        '1) El programa llega al <b>rombo</b> y evalúa la condición <font face="Courier">edad ≥ 18</font>.',
+        '2) Si es CIERTA, sigue la flecha "<b>Sí</b>" hacia la izquierda y ejecuta <font face="Courier">Escribir "Mayor"</font>.',
+        '3) Si es FALSA, sigue la flecha "<b>No</b>" hacia la derecha y ejecuta <font face="Courier">Escribir "Menor"</font>.',
+        '4) Las dos ramas se vuelven a juntar en el <b>punto de unión</b> de abajo y el programa continúa con lo que haya después del <font face="Courier">FinSi</font>.',
+    ]
+    for ps in pasos_si:
+        story.append(P('  ' + ps))
+    story.append(SP(6))
+
+
+def instr_segun(story):
+    story.append(H('3.7   Segun … Hacer / FinSegun  —  decisión múltiple', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Cuando una variable puede tener varios valores y queremos hacer algo '
+        'distinto para cada uno. Es un <font face="Courier">Si</font> con muchas ramas. Más limpio que '
+        'encadenar varios <font face="Courier">Si…SiNo Si…SiNo</font>.'
+    ))
+    story.append(_code_block(
+        'Definir dia Como Entero\n'
+        'Leer dia\n'
+        'Segun dia Hacer\n'
+        '    1: Escribir "Lunes"\n'
+        '    2: Escribir "Martes"\n'
+        '    3: Escribir "Miércoles"\n'
+        '    6, 7: Escribir "Fin de semana"\n'
+        '    De Otro Modo: Escribir "Día no válido"\n'
+        'FinSegun'
+    ))
+    story.append(P(
+        'Cada caso lleva el valor o valores (separados por coma), dos puntos y la instrucción. '
+        '<font face="Courier">De Otro Modo</font> es opcional y se ejecuta cuando no coincide ningún caso.'
+    ))
+    story.append(H('Diagrama', 4))
+    d = make_drawing(460, 200)
+    diamond_shape(d, 80, 160, 110, 50, 'Segun dia')
+    # Salidas a las 5 ramas
+    io_shape(d, 250, 175, 120, 24, 'Escribir "Lunes"')
+    io_shape(d, 250, 145, 120, 24, 'Escribir "Martes"')
+    io_shape(d, 250, 115, 130, 24, 'Escribir "Miércoles"')
+    io_shape(d, 250, 85,  150, 24, 'Escribir "Fin de semana"')
+    io_shape(d, 250, 55,  150, 24, 'Escribir "Día no válido"')
+    junction(d, 440, 115)
+    # Flechas
+    arrow_line(d, 135, 175, 190, 175, label='1', label_offset=(-22, 5))
+    arrow_line(d, 135, 160, 190, 145, label='2', label_offset=(-22, 5))
+    arrow_line(d, 135, 145, 185, 115, label='3', label_offset=(-22, 0))
+    arrow_line(d, 135, 130, 175, 85, label='6,7', label_offset=(-26, -3))
+    arrow_line(d, 80, 135, 175, 55, label='otro', label_offset=(-22, -8))
+    arrow_line(d, 310, 175, 430, 122)
+    arrow_line(d, 310, 145, 432, 118)
+    arrow_line(d, 320, 115, 432, 115)
+    arrow_line(d, 325, 85,  432, 110)
+    arrow_line(d, 325, 55,  432, 108)
+    story.append(d)
+    story.append(P(
+        '<b>Cómo se lee:</b> el rombo evalúa <font face="Courier">dia</font>. '
+        'Según su valor sale por una flecha (1, 2, 3, 6/7…) o por "otro" si no coincide. '
+        'Todas las ramas se reúnen al final y el programa continúa.',
+        NOTE
+    ))
+    story.append(SP(6))
+
+
+def instr_mientras(story):
+    story.append(H('3.8   Mientras … Hacer / FinMientras  —  bucle con condición al inicio', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Repite un bloque <b>mientras</b> se cumpla una condición. '
+        'Comprueba la condición <i>antes</i> de cada repetición. Si la condición ya es falsa la primera '
+        'vez, el cuerpo del bucle <b>no se ejecuta ni una vez</b>.'
+    ))
+    story.append(_code_block(
+        'Definir i Como Entero\n'
+        'i <- 1\n'
+        'Mientras i <= 10 Hacer\n'
+        '    Escribir i\n'
+        '    i <- i + 1\n'
+        'FinMientras'
+    ))
+    story.append(P(
+        '⚠ Asegúrate de que algo cambia dentro del bucle para que la condición acabe siendo falsa. '
+        'Si no, tu programa se queda repitiendo para siempre (bucle infinito).',
+        WARN
+    ))
+    story.append(H('Diagrama paso a paso', 4))
+    d = make_drawing(440, 240)
+    rect_shape(d, 220, 215, 90, 26, 'i ← 1')
+    diamond_shape(d, 220, 160, 130, 50, 'i ≤ 10')
+    io_shape(d, 220, 100, 140, 26, 'Escribir i')
+    rect_shape(d, 220, 60,  130, 26, 'i ← i + 1')
+    junction(d, 380, 160)
+    # Flechas principales (verticales)
+    arrow_line(d, 220, 202, 220, 185)
+    arrow_line(d, 220, 135, 220, 113, label='Sí', label_offset=(8, -8))
+    arrow_line(d, 220, 87,  220, 73)
+    # Salida derecha (No)
+    arrow_line(d, 285, 160, 365, 160, label='No', label_offset=(0, 6))
+    arrow_line(d, 380, 160, 380, 30)
+    arrow_line(d, 380, 30, 240, 30)   # placeholder; flecha hacia el siguiente bloque
+    # Bucle de retorno (flecha de regreso al rombo)
+    d.add(Line(220, 60 - 13, 130, 60 - 13, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Line(130, 60 - 13, 130, 160, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Line(130, 160, 155, 160, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Polygon(points=[155, 160, 148, 157, 148, 163], fillColor=C_ACCENT2, strokeColor=C_ACCENT2))
+    d.add(String(110, 100, 'vuelve', fontSize=7, fillColor=C_ACCENT2, fontName='Helvetica-Oblique', textAnchor='middle'))
+    story.append(d)
+    pasos_m = [
+        '1) Se inicializa la variable de control: <font face="Courier">i ← 1</font>.',
+        '2) Se llega al <b>rombo</b> y se comprueba la condición <font face="Courier">i ≤ 10</font>.',
+        '3) Si es CIERTA (Sí): se ejecuta el cuerpo del bucle (Escribir i; i ← i+1).',
+        '4) <b>Al terminar el cuerpo, la flecha amarilla VUELVE al rombo</b> (no continúa hacia abajo). Se vuelve a comprobar.',
+        '5) Cuando la condición pasa a ser FALSA (No), el bucle termina y el programa sigue por la salida derecha.',
+    ]
+    for ps in pasos_m:
+        story.append(P('  ' + ps))
+    story.append(SP(6))
+
+
+def instr_repetir(story):
+    story.append(H('3.9   Repetir … Hasta Que  —  bucle con condición al final', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Como <font face="Courier">Mientras</font>, pero comprueba la '
+        'condición <b>al final</b>. Eso significa que el cuerpo <b>siempre se ejecuta al menos una vez</b>.'
+    ))
+    story.append(P(
+        '⚠ Atención: la condición de <font face="Courier">Repetir</font> es de <b>SALIDA</b>. '
+        'Cuando se cumple, el bucle <b>TERMINA</b> (al revés que en Mientras).',
+        WARN
+    ))
+    story.append(_code_block(
+        'Definir pwd Como Cadena\n'
+        'Repetir\n'
+        '    Escribir "Introduce la contraseña:"\n'
+        '    Leer pwd\n'
+        'Hasta Que pwd = "secreto"\n'
+        'Escribir "Acceso permitido"'
+    ))
+    story.append(H('Diagrama paso a paso', 4))
+    d = make_drawing(440, 220)
+    junction(d, 220, 190)
+    io_shape(d, 220, 150, 200, 26, 'Escribir "Introduce..."')
+    io_shape(d, 220, 110, 130, 26, 'Leer pwd')
+    diamond_shape(d, 220, 60, 140, 50, 'pwd = "secreto"')
+    junction(d, 380, 60)
+    # Flechas dentro
+    arrow_line(d, 220, 180, 220, 163)
+    arrow_line(d, 220, 137, 220, 123)
+    arrow_line(d, 220, 97,  220, 85)
+    # Salida "Sí" hacia la derecha
+    arrow_line(d, 290, 60, 365, 60, label='Sí', label_offset=(0, 6))
+    # Bucle "No" (vuelve al inicio)
+    d.add(Line(150, 60, 80, 60, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Line(80, 60, 80, 190, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Line(80, 190, 205, 190, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Polygon(points=[205, 190, 197, 187, 197, 193], fillColor=C_ACCENT2, strokeColor=C_ACCENT2))
+    d.add(String(100, 130, 'No (vuelve)', fontSize=7, fillColor=C_ACCENT2, fontName='Helvetica-Oblique', textAnchor='middle'))
+    story.append(d)
+    pasos_r = [
+        '1) Se entra directamente al cuerpo (no hay condición previa).',
+        '2) Se ejecutan las instrucciones del cuerpo: Escribir, Leer…',
+        '3) Se llega al <b>rombo</b> de abajo y se comprueba <font face="Courier">pwd = "secreto"</font>.',
+        '4) Si CIERTA (Sí): se sale del bucle.',
+        '5) Si FALSA (No): la flecha amarilla vuelve al INICIO del cuerpo y se repite.',
+    ]
+    for ps in pasos_r:
+        story.append(P('  ' + ps))
+    story.append(SP(6))
+
+
+def instr_para(story):
+    story.append(H('3.10  Para … Hasta … Hacer / FinPara  —  bucle por contador', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Repite un bloque un número <b>fijo</b> de veces, usando una variable '
+        'contador. Es el bucle más típico cuando sabes exactamente cuántas iteraciones quieres.'
+    ))
+    story.append(_code_block(
+        'Definir i Como Entero\n'
+        'Para i <- 1 Hasta 10 Hacer\n'
+        '    Escribir i\n'
+        'FinPara\n'
+        '\n'
+        '// Con paso negativo (cuenta atrás del 5 al 1):\n'
+        'Para i <- 5 Hasta 1 Con Paso -1 Hacer\n'
+        '    Escribir i\n'
+        'FinPara'
+    ))
+    story.append(P(
+        'Por defecto el paso es <font face="Courier">+1</font>. Con <font face="Courier">Con Paso n</font> '
+        'puedes contar de 2 en 2, de 10 en 10, o hacia atrás con un paso negativo.'
+    ))
+    story.append(H('Diagrama paso a paso', 4))
+    d = make_drawing(440, 260)
+    rect_shape(d, 220, 230, 110, 26, 'i ← 1')
+    diamond_shape(d, 220, 175, 130, 50, 'i ≤ 10')
+    io_shape(d, 220, 115, 130, 26, 'Escribir i')
+    rect_shape(d, 220, 75,  130, 26, 'i ← i + 1')
+    junction(d, 380, 175)
+    # Flechas
+    arrow_line(d, 220, 217, 220, 200)
+    arrow_line(d, 220, 150, 220, 128, label='Sí', label_offset=(8, -8))
+    arrow_line(d, 220, 102, 220, 88)
+    arrow_line(d, 285, 175, 365, 175, label='No', label_offset=(0, 6))
+    # Retorno del incremento al rombo
+    d.add(Line(220, 75 - 13, 130, 75 - 13, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Line(130, 75 - 13, 130, 175, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Line(130, 175, 155, 175, strokeColor=C_ACCENT2, strokeWidth=1.3))
+    d.add(Polygon(points=[155, 175, 148, 172, 148, 178], fillColor=C_ACCENT2, strokeColor=C_ACCENT2))
+    story.append(d)
+    pasos_para = [
+        '1) <b>Inicialización</b>: la variable contador toma su valor inicial (en el ejemplo, i ← 1).',
+        '2) Se llega al rombo y se comprueba si i ≤ valor_final. Si NO, sale por la derecha y termina.',
+        '3) Si SÍ: se ejecuta el cuerpo (Escribir i).',
+        '4) Al terminar el cuerpo, <b>se incrementa el contador</b> (i ← i + paso).',
+        '5) Vuelve al rombo y se repite.',
+    ]
+    for ps in pasos_para:
+        story.append(P('  ' + ps))
+    story.append(SP(6))
+
+
+def instr_dimension(story):
+    story.append(H('3.11  Dimension v[N]  —  arreglos / vectores', 3))
+    story.append(P(
+        '<b>¿Para qué sirve?</b> Crea una "caja con muchos compartimentos" — un <b>vector</b> '
+        '(o arreglo). En lugar de tener variables sueltas para cada valor, las agrupas todas bajo '
+        'un solo nombre y las accedes por número (<b>índice</b>).'
+    ))
+    story.append(P(
+        '⚠ En PSeInt, los índices van de <b>1 a N</b> (no de 0 como en otros lenguajes).',
+        WARN
+    ))
+    story.append(_code_block(
+        'Definir i Como Entero\n'
+        'Dimension notas[5]\n'
+        '\n'
+        'Para i <- 1 Hasta 5 Hacer\n'
+        '    Escribir "Nota del alumno ", i, ":"\n'
+        '    Leer notas[i]\n'
+        'FinPara'
+    ))
+    story.append(P('Ahora <font face="Courier">notas[1]</font>, <font face="Courier">notas[2]</font>, …, <font face="Courier">notas[5]</font> son cinco "cajas" independientes a las que puedes acceder por índice.'))
+    story.append(P('En el diagrama, <font face="Courier">Dimension</font> es un rectángulo más:'))
+    story.append(_instr_shape('rect', 'Dimension notas[5]', w=170))
+    story.append(PageBreak())
+
+
+# ── Capítulo 4 — Tu primer programa completo ─────────────────────────────────
+def cap_programa_completo(story):
+    story.append(H('Capítulo 4 — Tu primer programa completo', 2))
+    story.append(P(
+        'Vamos a juntar todo lo aprendido en un programa pequeño pero completo: '
+        '<b>"¿Es par o impar?"</b>. El programa pide un número y dice si es par o impar.'
+    ))
+    story.append(H('Cómo se piensa el algoritmo', 3))
+    pasos_algoritmo = [
+        '1. Pedir al usuario un número entero.',
+        '2. Calcular el resto al dividir entre 2 (el operador <font face="Courier">MOD</font>).',
+        '3. Si el resto es 0 → es par. Si no → es impar.',
+        '4. Mostrar el resultado.',
+    ]
+    for ps in pasos_algoritmo:
+        story.append(P('  ' + ps))
+
+    story.append(H('El pseudocódigo', 3))
+    story.append(_code_block(
+        'Proceso ParImpar\n'
+        '    Definir n Como Entero\n'
+        '    Escribir "Introduce un número entero:"\n'
+        '    Leer n\n'
+        '    Si n MOD 2 = 0 Entonces\n'
+        '        Escribir n, " es PAR"\n'
+        '    SiNo\n'
+        '        Escribir n, " es IMPAR"\n'
+        '    FinSi\n'
+        'FinProceso'
+    ))
+
+    story.append(H('El diagrama de flujo', 3))
+    d = make_drawing(460, 380)
+    oval_shape(d, 230, 360, 130, 26, 'Inicio ParImpar')
+    rect_shape(d, 230, 315, 150, 26, 'Definir n Como Entero')
+    io_shape(d, 230, 270, 180, 26, 'Escribir "Introduce..."')
+    io_shape(d, 230, 230, 130, 26, 'Leer n')
+    diamond_shape(d, 230, 175, 150, 56, 'n MOD 2 = 0')
+    io_shape(d, 100, 90, 130, 26, 'Escribir "PAR"')
+    io_shape(d, 360, 90, 140, 26, 'Escribir "IMPAR"')
+    junction(d, 230, 35)
+    oval_shape(d, 230, 10, 60, 22, 'Fin')
+    # Flechas
+    arrow_line(d, 230, 347, 230, 328)
+    arrow_line(d, 230, 302, 230, 283)
+    arrow_line(d, 230, 257, 230, 243)
+    arrow_line(d, 230, 217, 230, 203)
+    arrow_line(d, 175, 153, 110, 105, label='Sí', label_offset=(-22, 8))
+    arrow_line(d, 285, 153, 350, 105, label='No', label_offset=(8, 8))
+    arrow_line(d, 100, 76, 220, 40)
+    arrow_line(d, 360, 76, 240, 40)
+    arrow_line(d, 230, 30, 230, 22)
+    story.append(d)
+
+    story.append(H('Recorrido del diagrama paso a paso', 3))
+    pasos_completo = [
+        '1) Entramos por el óvalo <b>Inicio ParImpar</b>.',
+        '2) Reservamos la variable <font face="Courier">n</font> de tipo Entero.',
+        '3) El paralelogramo <font face="Courier">Escribir "Introduce..."</font> muestra el mensaje.',
+        '4) El paralelogramo <font face="Courier">Leer n</font> espera a que el usuario introduzca un número.',
+        '5) El rombo evalúa <font face="Courier">n MOD 2 = 0</font>.',
+        '6) Si la condición es CIERTA (rama "Sí"): muestra que es PAR.',
+        '7) Si es FALSA (rama "No"): muestra que es IMPAR.',
+        '8) Las dos ramas se reúnen en el punto de unión.',
+        '9) Salimos por el óvalo <b>Fin</b>.',
+    ]
+    for ps in pasos_completo:
+        story.append(P('  ' + ps))
+    story.append(SP(8))
+    story.append(P(
+        'Ahora cárgalo en <b>PseudoWeb</b>: pulsa "+ Nuevo" y escríbelo, o pega esto en el editor. '
+        'Pulsa <font face="Courier">▶ Ejecutar</font> y prueba con varios números. Después pulsa '
+        '<font face="Courier">📊 Diagrama</font> y compara el diagrama que genera la app con el que '
+        'acabas de ver aquí — verás que es el mismo.',
+        NOTE
+    ))
+    story.append(PageBreak())
+
+
 def parte_3(story, exercises):
     story.append(H('PARTE III — Catálogo de 36 ejercicios'))
     story.append(HR())
@@ -625,7 +1365,7 @@ def parte_4(story):
     story.append(SP(30))
     story.append(HRFlowable(width='80%', thickness=1, color=C_MUTED, hAlign='CENTER', spaceAfter=10))
     story.append(P(
-        f'PseudoWeb · Manual del alumno · v0.6 · {datetime.date.today().strftime("%d/%m/%Y")}',
+        f'PseudoWeb · Manual del alumno · v0.8 · {datetime.date.today().strftime("%d/%m/%Y")}',
         ParagraphStyle('foot', fontSize=8, textColor=C_MUTED, alignment=TA_CENTER)
     ))
 
@@ -658,6 +1398,7 @@ def main():
     story = []
     cover_page(story)
     toc_page(story)
+    parte_didactica(story)
     parte_1(story)
     parte_2(story)
     parte_3(story, exercises)
