@@ -78,6 +78,7 @@
             </select>
             <button id="btnNuevo" title="Empezar un nuevo algoritmo desde una plantilla en blanco">+ Nuevo</button>
             <button id="btnExercises" title="Practicar con ejercicios y corregir tu código">📝 Ejercicios</button>
+            <button id="btnFlow" title="Diagrama de flujo del código actual">📊 Diagrama</button>
             <button id="btnManual" title="Abrir el manual del alumno (PDF)">📖 Manual</button>
             <button id="btnClear">Limpiar salida</button>
             <button id="btnRun" class="primary">▶ Ejecutar</button>
@@ -113,7 +114,22 @@
         </div>
     </div>
 
+    <!-- ── Modal: Diagrama de flujo ─────────────────────────────────────── -->
+    <div class="modal-backdrop" id="modalFlow">
+        <div class="modal modal-large" role="dialog" aria-modal="true">
+            <h2>📊 Diagrama de flujo</h2>
+            <div id="flowMsg" class="flow-msg" style="display: none;"></div>
+            <div id="flowContainer" class="flow-container"></div>
+            <div class="modal-actions">
+                <button id="flowDownloadBtn" title="Descarga el diagrama como SVG">⬇ Descargar SVG</button>
+                <span class="spacer"></span>
+                <button id="flowCloseBtn" class="primary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="pseint.js"></script>
+    <script src="flowchart.js"></script>
     <script src="exercises.js"></script>
     <script src="app.js"></script>
 </body>

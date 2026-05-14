@@ -433,3 +433,39 @@ footer {
     color: var(--muted);
     font-size: 13px;
 }
+
+/* ── Modal grande (diagrama de flujo) ──────────────────────────────────── */
+.modal.modal-large {
+    max-width: 1200px;
+}
+
+.flow-msg {
+    background: rgba(248, 113, 113, 0.10);
+    border-left: 3px solid var(--err);
+    padding: 10px 14px;
+    border-radius: 4px;
+    color: var(--err);
+    font-size: 12px;
+    line-height: 1.5;
+    margin: 8px 0;
+    white-space: pre-wrap;
+}
+.flow-msg.info {
+    background: rgba(96, 165, 250, 0.08);
+    border-left-color: var(--info);
+    color: var(--info);
+}
+
+.flow-container {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    min-height: 360px;
+    max-height: 70vh;
+    overflow: auto;
+    text-align: center;
+    margin: 8px 0;
+}
+.flow-container .ex-loading { padding: 60px 0; }
+.flow-container svg { max-width: none; }   /* permite scroll horizontal */

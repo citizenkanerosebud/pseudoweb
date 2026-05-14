@@ -20,6 +20,7 @@
     <div id="results"></div>
     <div id="summary"></div>
     <script src="pseint.js"></script>
+    <script src="flowchart.js"></script>
     <script src="exercises.js"></script>
     <script>
         const TESTS = [
@@ -876,6 +877,82 @@
                 Escribir "Hipotenusa: ", h
               FinProceso`,
               expectedScore: 10 },
+
+            // ── Tests del generador de diagramas de flujo ───────────────────
+            // Comprueban patrones semánticos del Mermaid generado (no bytes literales,
+            // porque las cadenas se escapan con #quot; según la sintaxis de Mermaid).
+            { name: 'Flowchart: programa simple (Inicio + Escribir + Fin)',
+              isFlowTest: true,
+              src: `Proceso H
+                Escribir "Hola"
+              FinProceso`,
+              expectIncludes: ['flowchart TD', 'Inicio: H', 'Escribir #quot;Hola#quot;', 'Fin'] },
+
+            { name: 'Flowchart: Si/SiNo crea diamante + dos ramas + join',
+              isFlowTest: true,
+              src: `Proceso P
+                Definir n Como Entero
+                Leer n
+                Si n > 0 Entonces
+                    Escribir "pos"
+                SiNo
+                    Escribir "neg"
+                FinSi
+              FinProceso`,
+              expectIncludes: ['{"n > 0"}', '|"Sí"|', '|"No"|', '#quot;pos#quot;', '#quot;neg#quot;'] },
+
+            { name: 'Flowchart: Mientras tiene arista de retroceso al diamante',
+              isFlowTest: true,
+              src: `Proceso M
+                Definir i Como Entero
+                i <- 0
+                Mientras i < 5 Hacer
+                    i <- i + 1
+                FinMientras
+              FinProceso`,
+              expectIncludes: ['{"i < 5"}', '|"Sí"|', '|"No"|'],
+              expectBackEdge: /(asg\d+) --> (while\d+)/   // arista desde el cuerpo (asignación) al diamante
+            },
+
+            { name: 'Flowchart: Para genera init + cond + body + inc',
+              isFlowTest: true,
+              src: `Proceso F
+                Definir i Como Entero
+                Para i <- 1 Hasta 10 Hacer
+                    Escribir i
+                FinPara
+              FinProceso`,
+              expectIncludes: ['"i ← 1"', '{"i ≤ 10"}', '"i ← i + 1"', 'Escribir'] },
+
+            { name: 'Flowchart: Segun genera diamante con múltiples ramas',
+              isFlowTest: true,
+              src: `Proceso S
+                Definir x Como Entero
+                Leer x
+                Segun x Hacer
+                    1: Escribir "uno"
+                    2: Escribir "dos"
+                    De Otro Modo: Escribir "otro"
+                FinSegun
+              FinProceso`,
+              expectIncludes: ['Segun x', '|"1"|', '|"2"|', '|"otro"|'] },
+
+            { name: 'Flowchart: Repetir/Hasta Que estructura do-while',
+              isFlowTest: true,
+              src: `Proceso R
+                Definir n Como Entero
+                Repetir
+                    Leer n
+                Hasta Que n = 0
+              FinProceso`,
+              expectIncludes: ['{"n = 0"}', 'Leer n', '|"Sí"|', '|"No"|'] },
+
+            { name: 'Flowchart: programa con error de sintaxis falla con PseudoError',
+              isFlowTest: true,
+              src: `Proceso X
+                Escribir 5 +
+              FinProceso`,
+              expectsError: /Expresión esperada|Se esperaba/ },
         ];
 
         function mockIO(inputs) {
@@ -895,6 +972,45 @@
             for (const t of TESTS) {
                 const div = document.createElement('div');
                 div.className = 'test';
+
+                // ── Tests del generador de diagramas ─────────────────────
+                if (t.isFlowTest) {
+                    try {
+                        const code = generateFlowchart(t.src);
+                        if (t.expectsError) {
+                            div.className += ' fail';
+                            div.textContent = `✗ ${t.name} — debería haber dado error`;
+                            fail++;
+                        } else {
+                            const missing = (t.expectIncludes || []).filter(s => !code.includes(s));
+                            const backOk = !t.expectBackEdge || t.expectBackEdge.test(code);
+                            if (missing.length === 0 && backOk) {
+                                div.className += ' pass';
+                                div.textContent = `✓ ${t.name}`;
+                                pass++;
+                            } else {
+                                div.className += ' fail';
+                                const reasons = [];
+                                if (missing.length) reasons.push(`faltan: ${JSON.stringify(missing)}`);
+                                if (!backOk) reasons.push(`sin arista de retroceso (regex ${t.expectBackEdge})`);
+                                div.innerHTML = `✗ ${t.name}<pre>${reasons.join('\n')}\n\n---\n${code}</pre>`;
+                                fail++;
+                            }
+                        }
+                    } catch (e) {
+                        if (t.expectsError && t.expectsError.test(e.message)) {
+                            div.className += ' pass';
+                            div.textContent = `✓ ${t.name} (error esperado: ${e.message})`;
+                            pass++;
+                        } else {
+                            div.className += ' fail';
+                            div.innerHTML = `✗ ${t.name}<pre>${e.message}</pre>`;
+                            fail++;
+                        }
+                    }
+                    resultsEl.appendChild(div);
+                    continue;
+                }
 
                 // ── Tests del grader (corrección de ejercicios) ──────────
                 if (t.isGraderTest) {

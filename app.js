@@ -965,6 +965,126 @@ FinProceso`,
         window.open('pseudoweb_manual.pdf', '_blank', 'noopener');
     });
 
+    // ── Diagrama de flujo (carga Mermaid bajo demanda desde CDN) ──────────
+    const btnFlow         = document.getElementById('btnFlow');
+    const modalFlow       = document.getElementById('modalFlow');
+    const flowContainer   = document.getElementById('flowContainer');
+    const flowMsg         = document.getElementById('flowMsg');
+    const flowCloseBtn    = document.getElementById('flowCloseBtn');
+    const flowDownloadBtn = document.getElementById('flowDownloadBtn');
+
+    let _mermaidLoading = null;
+    let _mermaidReady   = false;
+
+    function loadMermaid() {
+        if (_mermaidReady) return Promise.resolve();
+        if (_mermaidLoading) return _mermaidLoading;
+        _mermaidLoading = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
+            s.async = true;
+            s.onload = () => {
+                try {
+                    window.mermaid.initialize({
+                        startOnLoad: false,
+                        theme: 'dark',
+                        flowchart: { useMaxWidth: false, htmlLabels: true, curve: 'basis' },
+                    });
+                    _mermaidReady = true;
+                    resolve();
+                } catch (e) { reject(e); }
+            };
+            s.onerror = () => reject(new Error('No se pudo cargar Mermaid desde el CDN. Verifica tu conexión a internet.'));
+            document.head.appendChild(s);
+        });
+        return _mermaidLoading;
+    }
+
+    function flowShowMessage(text, isError) {
+        flowMsg.textContent = text;
+        flowMsg.className = 'flow-msg' + (isError ? '' : ' info');
+        flowMsg.style.display = '';
+    }
+    function flowHideMessage() {
+        flowMsg.style.display = 'none';
+        flowMsg.textContent = '';
+    }
+
+    async function openFlowModal() {
+        flowHideMessage();
+        flowContainer.innerHTML = '<div class="ex-loading"><div class="spinner" style="display:none;"></div>Generando diagrama…</div>';
+        modalFlow.classList.add('active');
+
+        // Generamos el código Mermaid desde el editor
+        let mermaidCode;
+        try {
+            mermaidCode = generateFlowchart(editor.value);
+        } catch (err) {
+            flowContainer.innerHTML = '';
+            flowShowMessage(
+                (err instanceof PseudoError ? err.message : (err.message || String(err)))
+                + '\n\nCorrige el error de sintaxis en el editor y vuelve a abrir el diagrama.',
+                true
+            );
+            return;
+        }
+
+        // Cargamos Mermaid si aún no está
+        try {
+            await loadMermaid();
+        } catch (err) {
+            flowContainer.innerHTML = '';
+            flowShowMessage(err.message || String(err), true);
+            return;
+        }
+
+        // Renderizamos
+        try {
+            const id = 'flow_' + Date.now();
+            const { svg } = await window.mermaid.render(id, mermaidCode);
+            flowContainer.innerHTML = svg;
+        } catch (err) {
+            flowContainer.innerHTML = '';
+            flowShowMessage(
+                'Mermaid no pudo dibujar el diagrama:\n' + (err.message || String(err))
+                + '\n\nEsto suele ocurrir con bloques muy grandes o con caracteres especiales en cadenas. Puedes simplificar el código o ver el código fuente del diagrama en la consola.',
+                true
+            );
+            console.warn('Mermaid render error:', err);
+            console.log('--- Código Mermaid generado: ---\n' + mermaidCode);
+        }
+    }
+
+    btnFlow.addEventListener('click', openFlowModal);
+    flowCloseBtn.addEventListener('click', () => modalFlow.classList.remove('active'));
+    modalFlow.addEventListener('click', (ev) => {
+        if (ev.target === modalFlow) modalFlow.classList.remove('active');
+    });
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && modalFlow.classList.contains('active')) {
+            modalFlow.classList.remove('active');
+        }
+    });
+
+    flowDownloadBtn.addEventListener('click', () => {
+        const svg = flowContainer.querySelector('svg');
+        if (!svg) {
+            flowShowMessage('Primero genera un diagrama válido.', true);
+            return;
+        }
+        // Necesitamos un <?xml...?> al inicio para que sea un SVG estándar fuera del navegador
+        const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svg);
+        const blob = new Blob([xml], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'diagrama_pseudoweb.svg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 500);
+    });
+
     btnNuevo.addEventListener('click', () => {
         const actual = editor.value.trim();
         if (actual && actual !== STARTER_TEMPLATE.trim() &&
