@@ -79,6 +79,7 @@
             <button id="btnNuevo" title="Empezar un nuevo algoritmo desde una plantilla en blanco">+ Nuevo</button>
             <button id="btnExercises" title="Practicar con ejercicios y corregir tu código">📝 Ejercicios</button>
             <button id="btnFlow" title="Diagrama de flujo del código actual">📊 Diagrama</button>
+            <button id="btnShare" title="Genera un enlace para compartir el código actual">🔗 Compartir</button>
             <button id="btnManual" title="Abrir el manual del alumno (PDF)">📖 Manual</button>
             <button id="btnClear">Limpiar salida</button>
             <button id="btnRun" class="primary">▶ Ejecutar</button>
@@ -114,6 +115,25 @@
         </div>
     </div>
 
+    <!-- ── Modal: Compartir programa ────────────────────────────────────── -->
+    <div class="modal-backdrop" id="modalShare">
+        <div class="modal" role="dialog" aria-modal="true">
+            <h2>🔗 Compartir programa</h2>
+            <p style="margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.5;">
+                Copia este enlace y mándalo a quien quieras. Quien lo abra verá el código cargado en su editor.
+                El programa va dentro de la propia URL — no hay servidor ni base de datos.
+            </p>
+            <textarea id="shareUrl" readonly rows="3" class="share-url"></textarea>
+            <div id="shareLenInfo" class="share-info"></div>
+            <div class="modal-actions">
+                <button id="shareOpenBtn">🚀 Abrir en pestaña nueva</button>
+                <span class="spacer"></span>
+                <button id="shareCloseBtn">Cerrar</button>
+                <button id="shareCopyBtn" class="primary">📋 Copiar al portapapeles</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ── Modal: Diagrama de flujo ─────────────────────────────────────── -->
     <div class="modal-backdrop" id="modalFlow">
         <div class="modal modal-large" role="dialog" aria-modal="true">
@@ -130,6 +150,7 @@
 
     <script src="pseint.js"></script>
     <script src="flowchart.js"></script>
+    <script src="share.js"></script>
     <script src="exercises.js"></script>
     <script src="app.js"></script>
 </body>

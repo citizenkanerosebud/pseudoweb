@@ -855,9 +855,28 @@ Proceso EcuacionCuadratica
 FinProceso`,
     };
 
-    // Restaura el último borrador guardado, o carga "Hola mundo" la primera vez
-    const savedDraft = localStorage.getItem(STORAGE_KEY);
-    editor.value = (savedDraft && savedDraft.trim()) ? savedDraft : EXAMPLES.hola;
+    // Prioridad de carga inicial: URL compartida > borrador en localStorage > Hola Mundo
+    const sharedCode = PseudoShare.readSharedCodeFromHash();
+    if (sharedCode) {
+        const previous = localStorage.getItem(STORAGE_KEY);
+        // Si ya había contenido propio (no un ejemplo ni la plantilla), pedimos confirmación
+        const isOwn = previous && previous.trim()
+                      && previous !== STARTER_TEMPLATE
+                      && !Object.values(EXAMPLES).some(s => s.trim() === previous.trim());
+        const proceed = !isOwn || confirm(
+            'Esta URL contiene un programa compartido.\n\n¿Cargarlo en el editor? Se perderá tu trabajo actual ' +
+            '(se mantendrá guardado en el navegador hasta que escribas algo nuevo).'
+        );
+        if (proceed) {
+            editor.value = sharedCode;
+        } else {
+            editor.value = previous;
+        }
+        PseudoShare.clearHashFromURL();
+    } else {
+        const savedDraft = localStorage.getItem(STORAGE_KEY);
+        editor.value = (savedDraft && savedDraft.trim()) ? savedDraft : EXAMPLES.hola;
+    }
 
     // Auto-guardado en localStorage (debounced 400 ms)
     let saveTimer;
@@ -1063,6 +1082,86 @@ FinProceso`,
     document.addEventListener('keydown', (ev) => {
         if (ev.key === 'Escape' && modalFlow.classList.contains('active')) {
             modalFlow.classList.remove('active');
+        }
+    });
+
+    // ── Compartir programa por URL ────────────────────────────────────────
+    const btnShare       = document.getElementById('btnShare');
+    const modalShare     = document.getElementById('modalShare');
+    const shareUrlEl     = document.getElementById('shareUrl');
+    const shareLenInfo   = document.getElementById('shareLenInfo');
+    const shareCopyBtn   = document.getElementById('shareCopyBtn');
+    const shareCloseBtn  = document.getElementById('shareCloseBtn');
+    const shareOpenBtn   = document.getElementById('shareOpenBtn');
+
+    btnShare.addEventListener('click', () => {
+        const code = editor.value;
+        if (!code.trim()) {
+            shareUrlEl.value = '';
+            shareLenInfo.className = 'share-info err';
+            shareLenInfo.textContent = 'El editor está vacío. Escribe algo de código antes de generar el enlace.';
+            modalShare.classList.add('active');
+            return;
+        }
+        const url = PseudoShare.buildShareURL(code);
+        shareUrlEl.value = url;
+        const len = url.length;
+        const codeLen = code.length;
+        if (len > 8000) {
+            shareLenInfo.className = 'share-info warn';
+            shareLenInfo.textContent =
+                `URL: ${len.toLocaleString('es')} caracteres (código: ${codeLen.toLocaleString('es')}). ` +
+                `Algunos servidores o clientes de correo pueden tener problemas con URLs tan largas. ` +
+                `Considera simplificar el código o pegarlo directamente.`;
+        } else {
+            shareLenInfo.className = 'share-info';
+            shareLenInfo.textContent =
+                `URL: ${len.toLocaleString('es')} caracteres (código: ${codeLen.toLocaleString('es')}). ` +
+                `Cabe en cualquier navegador moderno.`;
+        }
+        modalShare.classList.add('active');
+        setTimeout(() => { shareUrlEl.focus(); shareUrlEl.select(); }, 50);
+    });
+
+    shareCopyBtn.addEventListener('click', async () => {
+        if (!shareUrlEl.value) return;
+        let ok = false;
+        try {
+            await navigator.clipboard.writeText(shareUrlEl.value);
+            ok = true;
+        } catch (_) {
+            // Fallback: selección + execCommand (deprecado pero ampliamente soportado)
+            try {
+                shareUrlEl.focus(); shareUrlEl.select();
+                ok = document.execCommand('copy');
+            } catch (_) { ok = false; }
+        }
+        if (ok) {
+            const original = shareCopyBtn.textContent;
+            shareCopyBtn.textContent = '✓ Copiado';
+            shareCopyBtn.classList.add('copied');
+            setTimeout(() => {
+                shareCopyBtn.textContent = original;
+                shareCopyBtn.classList.remove('copied');
+            }, 1400);
+        } else {
+            shareLenInfo.className = 'share-info err';
+            shareLenInfo.textContent = 'No se pudo copiar automáticamente. Selecciona la URL y pulsa Ctrl+C.';
+        }
+    });
+
+    shareOpenBtn.addEventListener('click', () => {
+        if (!shareUrlEl.value) return;
+        window.open(shareUrlEl.value, '_blank', 'noopener');
+    });
+
+    shareCloseBtn.addEventListener('click', () => modalShare.classList.remove('active'));
+    modalShare.addEventListener('click', (ev) => {
+        if (ev.target === modalShare) modalShare.classList.remove('active');
+    });
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape' && modalShare.classList.contains('active')) {
+            modalShare.classList.remove('active');
         }
     });
 

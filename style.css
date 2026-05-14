@@ -469,3 +469,35 @@ footer {
 }
 .flow-container .ex-loading { padding: 60px 0; }
 .flow-container svg { max-width: none; }   /* permite scroll horizontal */
+
+/* ── Modal de compartir ────────────────────────────────────────────────── */
+textarea.share-url {
+    width: 100%;
+    background: var(--bg);
+    color: var(--accent-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 10px 12px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.45;
+    resize: vertical;
+    word-break: break-all;
+    outline: none;
+}
+textarea.share-url:focus { border-color: var(--accent); }
+
+.share-info {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 6px;
+    padding: 4px 0;
+}
+.share-info.warn { color: var(--accent-2); }
+.share-info.err  { color: var(--err); }
+
+button.copied {
+    background: var(--ok) !important;
+    color: var(--bg) !important;
+    border-color: var(--ok) !important;
+}
