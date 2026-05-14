@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>PseudoWeb — Test suite</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { padding: 20px; font-family: monospace; }
+        .test { padding: 6px 12px; margin: 4px 0; border-radius: 4px; }
+        .pass { background: #1a4d2e; color: #86efac; }
+        .fail { background: #4d1a1a; color: #f87171; }
+        .summary { padding: 12px; margin-top: 16px; font-size: 16px; font-weight: bold; border-radius: 6px; }
+        .summary.ok { background: #1a4d2e; color: #86efac; }
+        .summary.ko { background: #4d1a1a; color: #f87171; }
+        pre { background: #11131f; padding: 8px; border-radius: 4px; font-size: 11px; margin: 4px 0; }
+    </style>
+</head>
+<body>
+    <h1 style="color: var(--accent);">PseudoWeb — Test suite del intérprete</h1>
+    <div id="results"></div>
+    <div id="summary"></div>
+    <script src="pseint.js"></script>
+    <script src="exercises.js"></script>
+    <script>
+        const TESTS = [
+            { name: 'Hola mundo',
+              src: `Proceso Hola
+                Escribir "Hola, mundo"
+              FinProceso`,
+              inputs: [], expected: ['Hola, mundo'] },
+
+            { name: 'Suma simple (a+b)',
+              src: `Proceso Sum
+                Definir a, b, c Como Entero
+                a <- 5
+                b <- 7
+                c <- a + b
+                Escribir "Suma: ", c
+              FinProceso`,
+              inputs: [], expected: ['Suma: 12'] },
+
+            { name: 'Si/SiNo con MOD (n=8 par)',
+              src: `Proceso PI
+                Definir n Como Entero
+                Leer n
+                Si n MOD 2 = 0 Entonces
+                    Escribir n, " par"
+                SiNo
+                    Escribir n, " impar"
+                FinSi
+              FinProceso`,
+              inputs: ['8'], expected: ['8 par'] },
+
+            { name: 'Si/SiNo con MOD (n=7 impar)',
+              src: `Proceso PI
+                Definir n Como Entero
+                Leer n
+                Si n MOD 2 = 0 Entonces
+                    Escribir n, " par"
+                SiNo
+                    Escribir n, " impar"
+                FinSi
+              FinProceso`,
+              inputs: ['7'], expected: ['7 impar'] },
+
+            { name: 'Para — factorial(5) = 120',
+              src: `Proceso Fact
+                Definir n, i, f Como Entero
+                n <- 5
+                f <- 1
+                Para i <- 1 Hasta n Hacer
+                    f <- f * i
+                FinPara
+                Escribir f
+              FinProceso`,
+              inputs: [], expected: ['120'] },
+
+            { name: 'Mientras — suma 1..10 = 55',
+              src: `Proceso S
+                Definir i, s Como Entero
+                i <- 1
+                s <- 0
+                Mientras i <= 10 Hacer
+                    s <- s + i
+                    i <- i + 1
+                FinMientras
+                Escribir s
+              FinProceso`,
+              inputs: [], expected: ['55'] },
+
+            { name: 'Booleano → "VERDADERO"',
+              src: `Proceso C
+                Definir x Como Logico
+                x <- Verdadero
+                Escribir "valor=", x
+              FinProceso`,
+              inputs: [], expected: ['valor=VERDADERO'] },
+
+            { name: 'Operadores Y / NO con paréntesis',
+              src: `Proceso L
+                Definir a, b Como Entero
+                a <- 5
+                b <- 10
+                Si a > 0 Y b > 0 Entonces
+                    Escribir "ambos positivos"
+                FinSi
+                Si NO (a > b) Entonces
+                    Escribir "a no mayor que b"
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['ambos positivos', 'a no mayor que b'] },
+
+            { name: 'Para con paso negativo',
+              src: `Proceso P
+                Definir i Como Entero
+                Para i <- 5 Hasta 1 Con Paso -1 Hacer
+                    Escribir i
+                FinPara
+              FinProceso`,
+              inputs: [], expected: ['5','4','3','2','1'] },
+
+            { name: 'Lectura de cadena (Leer nombre)',
+              src: `Proceso Hola
+                Definir nombre Como Cadena
+                Leer nombre
+                Escribir "Hola ", nombre
+              FinProceso`,
+              inputs: ['Pedro'], expected: ['Hola Pedro'] },
+
+            { name: 'Operador ^ (potencia)',
+              src: `Proceso Pot
+                Definir x Como Real
+                x <- 2 ^ 10
+                Escribir x
+              FinProceso`,
+              inputs: [], expected: ['1024'] },
+
+            { name: 'División real',
+              src: `Proceso Div
+                Definir x Como Real
+                x <- 7 / 2
+                Escribir x
+              FinProceso`,
+              inputs: [], expected: ['3.5'] },
+
+            { name: 'Comentarios con //',
+              src: `Proceso C
+                // esto es un comentario
+                Escribir "ok" // tras instrucción también
+                // final
+              FinProceso`,
+              inputs: [], expected: ['ok'] },
+
+            { name: 'Error: variable no definida',
+              src: `Proceso E
+                Escribir x
+              FinProceso`,
+              inputs: [], expectsError: /'x'/ },
+
+            { name: 'Error: condición no lógica',
+              src: `Proceso E
+                Definir n Como Entero
+                n <- 5
+                Si n Entonces
+                    Escribir "x"
+                FinSi
+              FinProceso`,
+              inputs: [], expectsError: /lógica/ },
+
+            { name: 'Entero trunca al asignar (123/10 → 12)',
+              src: `Proceso T
+                Definir n Como Entero
+                n <- 123 / 10
+                Escribir n
+              FinProceso`,
+              inputs: [], expected: ['12'] },
+
+            { name: 'Invertir dígitos (1234 → 4321)',
+              src: `Proceso Inv
+                Definir n, inv, d Como Entero
+                n <- 1234
+                inv <- 0
+                Mientras n > 0 Hacer
+                    d <- n MOD 10
+                    inv <- inv * 10 + d
+                    n <- n / 10
+                FinMientras
+                Escribir inv
+              FinProceso`,
+              inputs: [], expected: ['4321'] },
+
+            { name: 'Primo: 7 es primo',
+              src: `Proceso P
+                Definir n, i Como Entero
+                Definir es Como Logico
+                n <- 7
+                es <- Verdadero
+                i <- 2
+                Mientras i * i <= n Y es Hacer
+                    Si n MOD i = 0 Entonces
+                        es <- Falso
+                    FinSi
+                    i <- i + 1
+                FinMientras
+                Si es Entonces
+                    Escribir "primo"
+                SiNo
+                    Escribir "no primo"
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['primo'] },
+
+            { name: 'Primo: 9 no es primo',
+              src: `Proceso P
+                Definir n, i Como Entero
+                Definir es Como Logico
+                n <- 9
+                es <- Verdadero
+                i <- 2
+                Mientras i * i <= n Y es Hacer
+                    Si n MOD i = 0 Entonces
+                        es <- Falso
+                    FinSi
+                    i <- i + 1
+                FinMientras
+                Si es Entonces
+                    Escribir "primo"
+                SiNo
+                    Escribir "no primo"
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['no primo'] },
+
+            { name: 'MCD(48, 36) por Euclides = 12',
+              src: `Proceso M
+                Definir a, b, r Como Entero
+                a <- 48
+                b <- 36
+                Mientras b <> 0 Hacer
+                    r <- a MOD b
+                    a <- b
+                    b <- r
+                FinMientras
+                Escribir a
+              FinProceso`,
+              inputs: [], expected: ['12'] },
+
+            { name: 'Fibonacci: primeros 6 términos',
+              src: `Proceso F
+                Definir n, i, a, b, sig Como Entero
+                n <- 6
+                a <- 0
+                b <- 1
+                Para i <- 1 Hasta n Hacer
+                    Escribir a
+                    sig <- a + b
+                    a <- b
+                    b <- sig
+                FinPara
+              FinProceso`,
+              inputs: [], expected: ['0','1','1','2','3','5'] },
+
+            { name: 'Triángulo: 3,3,3 → equilátero',
+              src: `Proceso T
+                Definir a, b, c Como Real
+                a <- 3
+                b <- 3
+                c <- 3
+                Si a = b Y b = c Entonces
+                    Escribir "equilatero"
+                SiNo
+                    Si a = b O b = c O a = c Entonces
+                        Escribir "isosceles"
+                    SiNo
+                        Escribir "escaleno"
+                    FinSi
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['equilatero'] },
+
+            { name: 'Calificación: nota 7.5 → NOTABLE',
+              src: `Proceso C
+                Definir nota Como Real
+                nota <- 7.5
+                Si nota < 5 Entonces
+                    Escribir "INSUFICIENTE"
+                SiNo
+                    Si nota < 6 Entonces
+                        Escribir "SUFICIENTE"
+                    SiNo
+                        Si nota < 7 Entonces
+                            Escribir "BIEN"
+                        SiNo
+                            Si nota < 9 Entonces
+                                Escribir "NOTABLE"
+                            SiNo
+                                Escribir "SOBRESALIENTE"
+                            FinSi
+                        FinSi
+                    FinSi
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['NOTABLE'] },
+
+            { name: 'Promedio con centinela (-1)',
+              src: `Proceso P
+                Definir n, suma, prom Como Real
+                Definir cont Como Entero
+                suma <- 0
+                cont <- 0
+                Leer n
+                Mientras n <> -1 Hacer
+                    suma <- suma + n
+                    cont <- cont + 1
+                    Leer n
+                FinMientras
+                prom <- suma / cont
+                Escribir prom
+              FinProceso`,
+              inputs: ['10', '20', '30', '-1'], expected: ['20'] },
+
+            { name: 'Array — Dimension + asignación + lectura',
+              src: `Proceso A
+                Dimension v[5]
+                v[1] <- 10
+                v[2] <- 20
+                v[3] <- 30
+                Escribir v[1] + v[2] + v[3]
+              FinProceso`,
+              inputs: [], expected: ['60'] },
+
+            { name: 'Array — Leer en bucle + suma',
+              src: `Proceso A
+                Definir i, suma Como Entero
+                Dimension v[3]
+                Para i <- 1 Hasta 3 Hacer
+                    Leer v[i]
+                FinPara
+                suma <- 0
+                Para i <- 1 Hasta 3 Hacer
+                    suma <- suma + v[i]
+                FinPara
+                Escribir suma
+              FinProceso`,
+              inputs: ['5', '10', '15'], expected: ['30'] },
+
+            { name: 'Array — máximo de un vector',
+              src: `Proceso M
+                Definir i, max Como Entero
+                Dimension v[4]
+                v[1] <- 3
+                v[2] <- 9
+                v[3] <- 1
+                v[4] <- 7
+                max <- v[1]
+                Para i <- 2 Hasta 4 Hacer
+                    Si v[i] > max Entonces
+                        max <- v[i]
+                    FinSi
+                FinPara
+                Escribir max
+              FinProceso`,
+              inputs: [], expected: ['9'] },
+
+            { name: 'Array — ordenación burbuja [3,1,2] → [1,2,3]',
+              src: `Proceso B
+                Definir i, j, temp, n Como Entero
+                Dimension v[3]
+                v[1] <- 3
+                v[2] <- 1
+                v[3] <- 2
+                n <- 3
+                Para i <- 1 Hasta n - 1 Hacer
+                    Para j <- 1 Hasta n - i Hacer
+                        Si v[j] > v[j + 1] Entonces
+                            temp <- v[j]
+                            v[j] <- v[j + 1]
+                            v[j + 1] <- temp
+                        FinSi
+                    FinPara
+                FinPara
+                Escribir v[1], ",", v[2], ",", v[3]
+              FinProceso`,
+              inputs: [], expected: ['1,2,3'] },
+
+            { name: 'Array — índice fuera de rango (error)',
+              src: `Proceso E
+                Dimension v[3]
+                v[5] <- 10
+              FinProceso`,
+              inputs: [], expectsError: /fuera de rango/ },
+
+            { name: 'Array — usar sin Dimension (error)',
+              src: `Proceso E
+                v[1] <- 10
+              FinProceso`,
+              inputs: [], expectsError: /no es un array/ },
+
+            { name: 'Segun — caso coincide (opcion=2)',
+              src: `Proceso S
+                Definir opcion Como Entero
+                opcion <- 2
+                Segun opcion Hacer
+                    1:
+                        Escribir "uno"
+                    2:
+                        Escribir "dos"
+                    3:
+                        Escribir "tres"
+                    De Otro Modo:
+                        Escribir "otro"
+                FinSegun
+              FinProceso`,
+              inputs: [], expected: ['dos'] },
+
+            { name: 'Segun — De Otro Modo (opcion=99)',
+              src: `Proceso S
+                Definir x Como Entero
+                x <- 99
+                Segun x Hacer
+                    1:
+                        Escribir "uno"
+                    2:
+                        Escribir "dos"
+                    De Otro Modo:
+                        Escribir "ninguno"
+                FinSegun
+              FinProceso`,
+              inputs: [], expected: ['ninguno'] },
+
+            { name: 'Segun con bloque interior (Si dentro de caso)',
+              src: `Proceso S
+                Definir opcion, a, b Como Entero
+                Definir r Como Real
+                opcion <- 4
+                a <- 10
+                b <- 0
+                Segun opcion Hacer
+                    1: Escribir a + b
+                    4:
+                        Si b <> 0 Entonces
+                            r <- a / b
+                            Escribir r
+                        SiNo
+                            Escribir "div0"
+                        FinSi
+                FinSegun
+              FinProceso`,
+              inputs: [], expected: ['div0'] },
+
+            { name: 'Segun sin coincidencia ni default (no imprime nada)',
+              src: `Proceso S
+                Definir x Como Entero
+                x <- 5
+                Escribir "antes"
+                Segun x Hacer
+                    1: Escribir "uno"
+                    2: Escribir "dos"
+                FinSegun
+                Escribir "despues"
+              FinProceso`,
+              inputs: [], expected: ['antes', 'despues'] },
+
+            { name: 'Repetir/Hasta Que — cuenta de 1 a 3',
+              src: `Proceso R
+                Definir i Como Entero
+                i <- 1
+                Repetir
+                    Escribir i
+                    i <- i + 1
+                Hasta Que i > 3
+              FinProceso`,
+              inputs: [], expected: ['1', '2', '3'] },
+
+            { name: 'Repetir se ejecuta al menos UNA vez (condición ya verdadera)',
+              src: `Proceso R
+                Definir x Como Entero
+                x <- 10
+                Repetir
+                    Escribir "una vez"
+                    x <- x + 1
+                Hasta Que x > 5
+              FinProceso`,
+              inputs: [], expected: ['una vez'] },
+
+            { name: 'Repetir sin "Que" (forma corta)',
+              src: `Proceso R
+                Definir i Como Entero
+                i <- 1
+                Repetir
+                    Escribir i
+                    i <- i + 1
+                Hasta i > 2
+              FinProceso`,
+              inputs: [], expected: ['1', '2'] },
+
+            { name: 'Función RC(16) = 4',
+              src: `Proceso F
+                Escribir RC(16)
+              FinProceso`,
+              inputs: [], expected: ['4'] },
+
+            { name: 'Función Trunc(3.7) = 3',
+              src: `Proceso F
+                Escribir Trunc(3.7)
+              FinProceso`,
+              inputs: [], expected: ['3'] },
+
+            { name: 'Función Redon(3.5) = 4 y Redon(3.49) = 3',
+              src: `Proceso F
+                Escribir Redon(3.5), "/", Redon(3.49)
+              FinProceso`,
+              inputs: [], expected: ['4/3'] },
+
+            { name: 'Función Abs(-7) = 7',
+              src: `Proceso F
+                Escribir Abs(-7), " ", Abs(7)
+              FinProceso`,
+              inputs: [], expected: ['7 7'] },
+
+            { name: 'Aleatorio(1, 6) está en rango 1..6',
+              src: `Proceso F
+                Definir x, i Como Entero
+                Definir ok Como Logico
+                ok <- Verdadero
+                Para i <- 1 Hasta 100 Hacer
+                    x <- Aleatorio(1, 6)
+                    Si x < 1 O x > 6 Entonces
+                        ok <- Falso
+                    FinSi
+                FinPara
+                Si ok Entonces
+                    Escribir "ok"
+                SiNo
+                    Escribir "fuera"
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['ok'] },
+
+            { name: 'Función Longitud("Hola") = 4',
+              src: `Proceso F
+                Escribir Longitud("Hola")
+              FinProceso`,
+              inputs: [], expected: ['4'] },
+
+            { name: 'Función Mayusculas("hola mundo") = "HOLA MUNDO"',
+              src: `Proceso F
+                Escribir Mayusculas("hola mundo")
+              FinProceso`,
+              inputs: [], expected: ['HOLA MUNDO'] },
+
+            { name: 'Función Subcadena("PseudoWeb", 1, 6) = "Pseudo"',
+              src: `Proceso F
+                Escribir Subcadena("PseudoWeb", 1, 6)
+              FinProceso`,
+              inputs: [], expected: ['Pseudo'] },
+
+            { name: 'Función Subcadena con i > j devuelve ""',
+              src: `Proceso F
+                Escribir "[", Subcadena("abc", 3, 1), "]"
+              FinProceso`,
+              inputs: [], expected: ['[]'] },
+
+            { name: 'Concatenar("Hello", " World")',
+              src: `Proceso F
+                Escribir Concatenar("Hello", " World")
+              FinProceso`,
+              inputs: [], expected: ['Hello World'] },
+
+            { name: 'Palíndromo "neuquen" → SÍ',
+              src: `Proceso P
+                Definir s Como Cadena
+                Definir i, n Como Entero
+                Definir esP Como Logico
+                s <- "neuquen"
+                n <- Longitud(s)
+                esP <- Verdadero
+                Para i <- 1 Hasta n / 2 Hacer
+                    Si Subcadena(s, i, i) <> Subcadena(s, n - i + 1, n - i + 1) Entonces
+                        esP <- Falso
+                    FinSi
+                FinPara
+                Si esP Entonces
+                    Escribir "si"
+                SiNo
+                    Escribir "no"
+                FinSi
+              FinProceso`,
+              inputs: [], expected: ['si'] },
+
+            { name: 'Constante PI ≈ 3.14159...',
+              src: `Proceso F
+                Definir x Como Real
+                x <- Redon(PI * 100)
+                Escribir x
+              FinProceso`,
+              inputs: [], expected: ['314'] },
+
+            { name: 'Función no definida (error)',
+              src: `Proceso F
+                Escribir Inexistente(5)
+              FinProceso`,
+              inputs: [], expectsError: /no definida/ },
+
+            { name: 'Aridad incorrecta (error)',
+              src: `Proceso F
+                Escribir Longitud("a", "b")
+              FinProceso`,
+              inputs: [], expectsError: /argumento/ },
+
+            { name: 'RC de número negativo (error)',
+              src: `Proceso F
+                Escribir RC(-1)
+              FinProceso`,
+              inputs: [], expectsError: /negativo/ },
+
+            // ── Tests del grader de ejercicios ──────────────────────────────
+            { name: 'Grader: solución correcta de "Perímetro" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'perimetro_cuadrado',
+              src: `Proceso Perimetro
+                Definir lado, p Como Real
+                Leer lado
+                p <- 4 * lado
+                Escribir "Perímetro: ", p
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader: solución incorrecta (* 5 en vez de * 4) → 1/10 (solo el 0)',
+              isGraderTest: true,
+              exerciseId: 'perimetro_cuadrado',
+              src: `Proceso Perimetro
+                Definir lado, p Como Real
+                Leer lado
+                p <- 5 * lado
+                Escribir "Perímetro: ", p
+              FinProceso`,
+              expectedScore: 1 },
+
+            { name: 'Grader: solución correcta de "Múltiplo de 3" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'multiplo_3',
+              src: `Proceso M
+                Definir n Como Entero
+                Leer n
+                Si n MOD 3 = 0 Entonces
+                    Escribir "SI"
+                SiNo
+                    Escribir "NO"
+                FinSi
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader: solución correcta de "Suma N pares" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'suma_n_pares',
+              src: `Proceso S
+                Definir n, i, suma Como Entero
+                Leer n
+                suma <- 0
+                Para i <- 1 Hasta n Hacer
+                    suma <- suma + 2 * i
+                FinPara
+                Escribir "Suma: ", suma
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader: solución de "Suma hasta 0" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'sumar_hasta_cero',
+              src: `Proceso S
+                Definir n, suma Como Real
+                suma <- 0
+                Leer n
+                Mientras n <> 0 Hacer
+                    suma <- suma + n
+                    Leer n
+                FinMientras
+                Escribir "Suma: ", suma
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader: "Adivinar el 7" con Repetir → 10/10',
+              isGraderTest: true,
+              exerciseId: 'adivinar_7',
+              src: `Proceso A
+                Definir intento, intentos Como Entero
+                intentos <- 0
+                Repetir
+                    Leer intento
+                    intentos <- intentos + 1
+                Hasta Que intento = 7
+                Escribir "Intentos: ", intentos
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader: "Tirar dados" con Aleatorio → 10/10 (chequeo de rango)',
+              isGraderTest: true,
+              exerciseId: 'tirar_dados',
+              src: `Proceso T
+                Definir n, i, suma Como Entero
+                Leer n
+                suma <- 0
+                Para i <- 1 Hasta n Hacer
+                    suma <- suma + Aleatorio(1, 6)
+                FinPara
+                Escribir "Suma: ", suma
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader: "Área círculo" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'area_circulo',
+              src: `Proceso A
+                Definir r Como Real
+                Definir a Como Entero
+                Leer r
+                a <- Redon(PI * r ^ 2)
+                Escribir "Area: ", a
+              FinProceso`,
+              expectedScore: 10 },
+
+            // ── Fase 2 — un test por nuevo grupo de ejercicios ─────────────
+            { name: 'Grader (F2): "Doble y triple" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'doble_triple',
+              src: `Proceso D
+                Definir n Como Real
+                Leer n
+                Escribir "Doble: ", 2*n, ", Triple: ", 3*n
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Calificación" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'calificacion',
+              src: `Proceso C
+                Definir nota Como Real
+                Leer nota
+                Si nota < 0 O nota > 10 Entonces
+                    Escribir "FUERA DE RANGO"
+                SiNo
+                    Si nota < 5 Entonces
+                        Escribir "INSUFICIENTE"
+                    SiNo
+                        Si nota < 6 Entonces
+                            Escribir "SUFICIENTE"
+                        SiNo
+                            Si nota < 7 Entonces
+                                Escribir "BIEN"
+                            SiNo
+                                Si nota < 9 Entonces
+                                    Escribir "NOTABLE"
+                                SiNo
+                                    Escribir "SOBRESALIENTE"
+                                FinSi
+                            FinSi
+                        FinSi
+                    FinSi
+                FinSi
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Factorial" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'factorial',
+              src: `Proceso F
+                Definir n, i, f Como Entero
+                Leer n
+                f <- 1
+                Para i <- 1 Hasta n Hacer
+                    f <- f * i
+                FinPara
+                Escribir n, "! = ", f
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "¿Es primo?" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'es_primo',
+              src: `Proceso P
+                Definir n, i Como Entero
+                Definir esp Como Logico
+                Leer n
+                esp <- Verdadero
+                Para i <- 2 Hasta n - 1 Hacer
+                    Si n MOD i = 0 Entonces
+                        esp <- Falso
+                    FinSi
+                FinPara
+                Si esp Entonces
+                    Escribir "PRIMO"
+                SiNo
+                    Escribir "NO PRIMO"
+                FinSi
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Máximo de vector" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'max_vector',
+              src: `Proceso M
+                Definir n, i, max Como Entero
+                Dimension v[100]
+                Leer n
+                Para i <- 1 Hasta n Hacer
+                    Leer v[i]
+                FinPara
+                max <- v[1]
+                Para i <- 2 Hasta n Hacer
+                    Si v[i] > max Entonces
+                        max <- v[i]
+                    FinSi
+                FinPara
+                Escribir "Maximo: ", max
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Tabla del N" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'tabla_n',
+              src: `Proceso T
+                Definir n, i Como Entero
+                Leer n
+                Para i <- 1 Hasta 10 Hacer
+                    Escribir n, " x ", i, " = ", n * i
+                FinPara
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Lanzar monedas" → 10/10 (check estructural)',
+              isGraderTest: true,
+              exerciseId: 'lanzar_monedas',
+              src: `Proceso L
+                Definir n, i, r, caras, cruces Como Entero
+                Leer n
+                caras <- 0
+                cruces <- 0
+                Para i <- 1 Hasta n Hacer
+                    r <- Aleatorio(0, 1)
+                    Si r = 0 Entonces
+                        caras <- caras + 1
+                    SiNo
+                        cruces <- cruces + 1
+                    FinSi
+                FinPara
+                Escribir "Caras: ", caras, ", Cruces: ", cruces
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Invertir cadena" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'invertir_cadena',
+              src: `Proceso I
+                Definir palabra, inv Como Cadena
+                Definir i, n Como Entero
+                Leer palabra
+                n <- Longitud(palabra)
+                inv <- ""
+                Para i <- n Hasta 1 Con Paso -1 Hacer
+                    inv <- Concatenar(inv, Subcadena(palabra, i, i))
+                FinPara
+                Escribir "Invertida: ", inv
+              FinProceso`,
+              expectedScore: 10 },
+
+            { name: 'Grader (F2): "Hipotenusa" → 10/10',
+              isGraderTest: true,
+              exerciseId: 'hipotenusa',
+              src: `Proceso H
+                Definir a, b Como Real
+                Definir h Como Entero
+                Leer a
+                Leer b
+                h <- Redon(RC(a ^ 2 + b ^ 2))
+                Escribir "Hipotenusa: ", h
+              FinProceso`,
+              expectedScore: 10 },
+        ];
+
+        function mockIO(inputs) {
+            let idx = 0;
+            const outputs = [];
+            return {
+                output: t => outputs.push(t),
+                input:  () => Promise.resolve(inputs[idx++] ?? ''),
+                outputs
+            };
+        }
+
+        (async () => {
+            const resultsEl = document.getElementById('results');
+            let pass = 0, fail = 0;
+
+            for (const t of TESTS) {
+                const div = document.createElement('div');
+                div.className = 'test';
+
+                // ── Tests del grader (corrección de ejercicios) ──────────
+                if (t.isGraderTest) {
+                    try {
+                        const ex = PseudoExercises.EXERCISES.find(e => e.id === t.exerciseId);
+                        if (!ex) throw new Error(`ejercicio '${t.exerciseId}' no encontrado`);
+                        const result = await PseudoExercises.gradeExercise(ex, t.src);
+                        if (result.score === t.expectedScore) {
+                            div.className += ' pass';
+                            div.textContent = `✓ ${t.name}  → ${result.score}/${result.total}`;
+                            pass++;
+                        } else {
+                            div.className += ' fail';
+                            const failedCases = result.results.filter(r => !r.passed).map(r => `#${r.idx}`).join(', ');
+                            div.innerHTML = `✗ ${t.name}<pre>esperado: ${t.expectedScore}/${result.total}\nobtenido: ${result.score}/${result.total}\nfallos en: ${failedCases || '(ninguno)'}</pre>`;
+                            fail++;
+                        }
+                    } catch (e) {
+                        div.className += ' fail';
+                        div.innerHTML = `✗ ${t.name}<pre>${e.message}</pre>`;
+                        fail++;
+                    }
+                    resultsEl.appendChild(div);
+                    continue;
+                }
+
+                // ── Tests del intérprete ──────────────────────────────────
+                const io = mockIO(t.inputs);
+                try {
+                    await runPseudo(t.src, io);
+                    if (t.expectsError) {
+                        div.className += ' fail';
+                        div.textContent = `✗ ${t.name} — debería haber dado error`;
+                        fail++;
+                    } else {
+                        const ok = JSON.stringify(io.outputs) === JSON.stringify(t.expected);
+                        if (ok) {
+                            div.className += ' pass';
+                            div.textContent = `✓ ${t.name}`;
+                            pass++;
+                        } else {
+                            div.className += ' fail';
+                            div.innerHTML = `✗ ${t.name}<pre>esperado: ${JSON.stringify(t.expected)}\nobtenido: ${JSON.stringify(io.outputs)}</pre>`;
+                            fail++;
+                        }
+                    }
+                } catch (e) {
+                    if (t.expectsError && t.expectsError.test(e.message)) {
+                        div.className += ' pass';
+                        div.textContent = `✓ ${t.name} (error esperado: ${e.message})`;
+                        pass++;
+                    } else {
+                        div.className += ' fail';
+                        div.innerHTML = `✗ ${t.name}<pre>${e.message}</pre>`;
+                        fail++;
+                    }
+                }
+                resultsEl.appendChild(div);
+            }
+
+            const sum = document.getElementById('summary');
+            sum.className = 'summary ' + (fail === 0 ? 'ok' : 'ko');
+            sum.textContent = `${pass} OK · ${fail} fallos · ${TESTS.length} total`;
+        })();
+    </script>
+</body>
+</html>

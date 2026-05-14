@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PseudoWeb — IDE de pseudocódigo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>PseudoWeb<span class="subtitle">v0.6 · compatible PSeInt · 36 ejercicios</span></h1>
+        <div class="actions">
+            <select id="examples" title="Cargar ejemplo">
+                <option value="">— Cargar ejemplo —</option>
+                <optgroup label="① Básico — Entrada/Salida">
+                    <option value="hola">Hola mundo</option>
+                    <option value="suma2">Suma de dos números</option>
+                    <option value="area_rect">Área de un rectángulo</option>
+                </optgroup>
+                <optgroup label="② Condicionales simples">
+                    <option value="par">Par o impar</option>
+                    <option value="signo">Positivo, negativo o cero</option>
+                    <option value="mayor_edad">Mayor de edad</option>
+                </optgroup>
+                <optgroup label="③ Condicionales múltiples">
+                    <option value="mayor3">Mayor de tres</option>
+                    <option value="nota">Calificación (nota → texto)</option>
+                    <option value="triangulo">Tipo de triángulo</option>
+                </optgroup>
+                <optgroup label="④ Bucles Para">
+                    <option value="tabla">Tabla de multiplicar</option>
+                    <option value="factorial">Factorial</option>
+                    <option value="fibonacci">Serie de Fibonacci</option>
+                </optgroup>
+                <optgroup label="⑤ Bucles Mientras">
+                    <option value="suma_n">Suma de los primeros N</option>
+                    <option value="validar">Validar entrada (0-10)</option>
+                    <option value="adivinar">Adivina el número</option>
+                    <option value="promedio">Promedio con centinela</option>
+                </optgroup>
+                <optgroup label="⑥ Algoritmos clásicos">
+                    <option value="primo">¿Es número primo?</option>
+                    <option value="mcd">Máximo común divisor (Euclides)</option>
+                    <option value="invertir">Invertir dígitos de un número</option>
+                </optgroup>
+                <optgroup label="⑦ Listas (arreglos / Dimension)">
+                    <option value="suma_vector">Suma de un vector</option>
+                    <option value="max_vector">Máximo de un vector</option>
+                    <option value="busqueda">Búsqueda secuencial</option>
+                    <option value="invertir_vector">Invertir un vector</option>
+                    <option value="burbuja">Ordenación burbuja</option>
+                </optgroup>
+                <optgroup label="⑧ Menús (Segun / FinSegun)">
+                    <option value="calculadora">Calculadora con menú</option>
+                    <option value="gestor_notas">Gestor de notas</option>
+                    <option value="conversor">Conversor de unidades</option>
+                </optgroup>
+                <optgroup label="⑨ Bucle Repetir / Hasta Que">
+                    <option value="validar_repetir">Validar entrada (Repetir)</option>
+                    <option value="menu_repetir">Menú principal (Repetir)</option>
+                    <option value="tabla_repetir">Tabla pidiendo "otra"</option>
+                </optgroup>
+                <optgroup label="⑩ Números aleatorios y juegos">
+                    <option value="dado">Tirar un dado N veces</option>
+                    <option value="piedra_papel_tijera">Piedra · papel · tijera</option>
+                </optgroup>
+                <optgroup label="⑪ Cadenas de texto">
+                    <option value="longitud_palabra">Longitud de una palabra</option>
+                    <option value="palindromo">¿Es palíndromo?</option>
+                    <option value="contar_vocales">Contar vocales</option>
+                    <option value="mayus_minus">Mayúsculas / minúsculas</option>
+                </optgroup>
+                <optgroup label="⑫ Funciones matemáticas">
+                    <option value="raiz_cuadrada">Raíz cuadrada</option>
+                    <option value="hipotenusa">Hipotenusa (Pitágoras)</option>
+                    <option value="ecuacion_cuadratica">Ecuación cuadrática</option>
+                </optgroup>
+            </select>
+            <button id="btnNuevo" title="Empezar un nuevo algoritmo desde una plantilla en blanco">+ Nuevo</button>
+            <button id="btnExercises" title="Practicar con ejercicios y corregir tu código">📝 Ejercicios</button>
+            <button id="btnManual" title="Abrir el manual del alumno (PDF)">📖 Manual</button>
+            <button id="btnClear">Limpiar salida</button>
+            <button id="btnRun" class="primary">▶ Ejecutar</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="pane">
+            <div class="pane-header">Editor — pseudocódigo</div>
+            <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        </section>
+
+        <section class="pane">
+            <div class="pane-header">Salida del programa</div>
+            <div class="output-wrap">
+                <pre id="output"></pre>
+                <div id="inputRow">
+                    <span id="inputLabel">Leer:</span>
+                    <input id="inputField" type="text" placeholder="Escribe el valor y pulsa Enter" autocomplete="off">
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        PseudoWeb v0.6 — intérprete pseudocódigo + 36 ejercicios corregidos automáticamente, compatible con PSeInt
+    </footer>
+
+    <!-- ── Modal: Ejercicios ────────────────────────────────────────────── -->
+    <div class="modal-backdrop" id="modalEx">
+        <div class="modal" role="dialog" aria-modal="true">
+            <div id="exContent"></div>
+        </div>
+    </div>
+
+    <script src="pseint.js"></script>
+    <script src="exercises.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

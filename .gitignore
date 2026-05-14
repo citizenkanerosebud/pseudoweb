@@ -1,0 +1,17 @@
+# Editor caches
+.vscode/
+.idea/
+*.swp
+*~
+
+# Sistemas operativos
+.DS_Store
+Thumbs.db
+
+# Python (generador del manual)
+__pycache__/
+*.pyc
+
+# Temporales
+*.tmp
+*.bak
