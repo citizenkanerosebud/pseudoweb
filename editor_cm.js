@@ -103,14 +103,14 @@
     window.setupEditor = async function (textareaEl) {
         let cm;
         try {
-            // Carga paralela de los módulos de CodeMirror desde esm.sh.
-            // Timeout de 6 s para que la app no quede colgada si la red falla.
+            // Carga paralela desde esm.sh — NO usamos el paquete umbrella
+            // `codemirror`, sino sus submódulos: esm.sh exporta el umbrella
+            // solo como `default` y nos quedaríamos sin EditorView/basicSetup.
             const withTimeout = (p, ms) => Promise.race([
                 p,
                 new Promise((_, rej) => setTimeout(() => rej(new Error('timeout cargando CodeMirror')), ms)),
             ]);
             cm = await Promise.all([
-                withTimeout(import('https://esm.sh/codemirror@6'),            6000),
                 withTimeout(import('https://esm.sh/@codemirror/view@6'),      6000),
                 withTimeout(import('https://esm.sh/@codemirror/state@6'),     6000),
                 withTimeout(import('https://esm.sh/@codemirror/commands@6'),  6000),
@@ -122,12 +122,17 @@
             return makeTextareaWrapper(textareaEl);
         }
 
-        const [mainMod, viewMod, stateMod, cmdMod, langMod, hlMod] = cm;
-        const { basicSetup, EditorView } = mainMod;
-        const { keymap } = viewMod;
+        const [viewMod, stateMod, cmdMod, langMod, hlMod] = cm;
+        const {
+            EditorView, keymap, lineNumbers, highlightActiveLine,
+            highlightActiveLineGutter, drawSelection,
+        } = viewMod;
         const { EditorState, Compartment } = stateMod;
-        const { indentWithTab } = cmdMod;
-        const { StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit } = langMod;
+        const { defaultKeymap, history, historyKeymap, indentWithTab } = cmdMod;
+        const {
+            StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit,
+            bracketMatching, indentOnInput,
+        } = langMod;
         const { tags: t } = hlMod;
 
         // ── Lenguaje PSeInt vía StreamLanguage ────────────────────────────────
@@ -253,13 +258,28 @@
             if (upd.docChanged) changeCbs.forEach(fn => fn());
         });
 
+        // ── Mini-setup (sustituye al `basicSetup` del umbrella) ──────────────
+        const minSetup = [
+            lineNumbers(),
+            highlightActiveLine(),
+            highlightActiveLineGutter(),
+            drawSelection(),
+            history(),
+            bracketMatching(),
+            indentOnInput(),
+            keymap.of([
+                ...defaultKeymap,    // flechas, Home/End, Ctrl+A, ...
+                ...historyKeymap,    // Ctrl+Z / Ctrl+Y
+                indentWithTab,       // Tab → 4 espacios
+            ]),
+        ];
+
         // ── Crea el view, lo inserta antes del textarea y oculta el textarea ──
         const view = new EditorView({
             state: EditorState.create({
                 doc: textareaEl.value || '',
                 extensions: [
-                    basicSetup,
-                    keymap.of([indentWithTab]),
+                    minSetup,
                     indentUnit.of('    '),
                     pseudoStream,
                     syntaxHighlighting(highlightStyle),
