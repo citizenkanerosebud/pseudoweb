@@ -1,8 +1,9 @@
 // PseudoWeb — wiring de la UI (MVP v0.1)
 // Conecta el editor + botones con runPseudo() del intérprete.
 
-(function () {
-    const editor      = document.getElementById('editor');
+(async function () {
+    const editorEl    = document.getElementById('editor');
+    const editor      = await window.setupEditor(editorEl);
     const output      = document.getElementById('output');
     const btnRun      = document.getElementById('btnRun');
     const btnClear    = document.getElementById('btnClear');
@@ -880,7 +881,7 @@ FinProceso`,
 
     // Auto-guardado en localStorage (debounced 400 ms)
     let saveTimer;
-    editor.addEventListener('input', () => {
+    editor.onChange(() => {
         clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
             try { localStorage.setItem(STORAGE_KEY, editor.value); } catch (_) {}
@@ -959,22 +960,11 @@ FinProceso`,
         }
     }
 
-    // ── Atajos de teclado ─────────────────────────────────────────────────
-    editor.addEventListener('keydown', (ev) => {
-        // Ctrl+Enter o F5 → ejecutar
-        if ((ev.ctrlKey && ev.key === 'Enter') || ev.key === 'F5') {
-            ev.preventDefault();
-            ejecutar();
-            return;
-        }
-        // Tab → insertar 4 espacios (en lugar de cambiar el foco)
-        if (ev.key === 'Tab') {
-            ev.preventDefault();
-            const s = editor.selectionStart, e = editor.selectionEnd;
-            editor.value = editor.value.substring(0, s) + '    ' + editor.value.substring(e);
-            editor.selectionStart = editor.selectionEnd = s + 4;
-        }
-    });
+    // ── Atajos de teclado (Tab ya lo gestiona CodeMirror) ─────────────────
+    editor.addKeymap([
+        { key: 'Ctrl-Enter', run: () => { ejecutar(); return true; }, preventDefault: true },
+        { key: 'F5',         run: () => { ejecutar(); return true; }, preventDefault: true },
+    ]);
 
     // ── Wiring de botones ─────────────────────────────────────────────────
     btnRun.addEventListener('click', ejecutar);

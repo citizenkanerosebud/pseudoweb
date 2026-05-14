@@ -153,6 +153,18 @@ main {
 
 #editor:focus { background: #11131f; }
 
+/* ── Integración de CodeMirror 6 (sobrescribe lo necesario del tema) ───── */
+.cm-editor {
+    flex: 1;
+    overflow: hidden;
+    background: var(--bg);
+    height: 100%;
+}
+.cm-editor.cm-focused { outline: none; }
+.cm-scroller {
+    line-height: 1.55;
+}
+
 /* ── Output ────────────────────────────────────────────────────────────── */
 .output-wrap {
     flex: 1;
