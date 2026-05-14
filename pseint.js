@@ -294,17 +294,38 @@ class Parser {
         return { type: 'Segun', expr, cases, defaultCase, line: tok.line };
     }
     parseSegunCaseBody() {
-        // Un caso termina cuando empieza el siguiente (NUMBER ':' o STRING ':'),
-        // cuando aparece 'De Otro Modo' o cuando llega 'FinSegun'.
+        // Un caso termina cuando empieza el siguiente, cuando aparece 'De Otro
+        // Modo' o cuando llega 'FinSegun'. Un nuevo caso empieza con:
+        //   (NUMBER|STRING) (',' (NUMBER|STRING))* ':'
         const stmts = [];
         while (true) {
-            const t  = this.peek();
-            const t1 = this.tokens[this.pos + 1];
+            const t = this.peek();
             if (t.type === 'FINSEGUN' || t.type === 'DE' || t.type === 'EOF') break;
-            if ((t.type === 'NUMBER' || t.type === 'STRING') && t1 && t1.type === 'OP' && t1.value === ':') break;
+            if (this._looksLikeCaseStart()) break;
             stmts.push(this.parseStatement());
         }
         return stmts;
+    }
+
+    _looksLikeCaseStart() {
+        let i = this.pos;
+        const t0 = this.tokens[i];
+        if (!t0 || (t0.type !== 'NUMBER' && t0.type !== 'STRING')) return false;
+        i++;
+        while (i < this.tokens.length) {
+            const tk = this.tokens[i];
+            if (tk.type === 'OP' && tk.value === ':') return true;
+            if (tk.type === 'OP' && tk.value === ',') {
+                const tn = this.tokens[i + 1];
+                if (tn && (tn.type === 'NUMBER' || tn.type === 'STRING')) {
+                    i += 2;
+                    continue;
+                }
+                return false;
+            }
+            return false;
+        }
+        return false;
     }
 
     parseMientras() {

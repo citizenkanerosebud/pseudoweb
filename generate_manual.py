@@ -100,6 +100,28 @@ def color_table(data, col_widths, extra=None):
     return t
 
 
+# ── Parser de solutions.js ───────────────────────────────────────────────────
+def parse_solutions(text):
+    """Extrae las soluciones de solutions.js leyendo el JS como texto.
+    Misma estrategia que parse_exercises."""
+    id_re = re.compile(r"^\s{4}\{\s*\n\s+id:\s*'([^']+)'", re.MULTILINE)
+    starts = [(m.start(), m.group(1)) for m in id_re.finditer(text)]
+    out = []
+    for i, (pos, sid) in enumerate(starts):
+        end = starts[i + 1][0] if i + 1 < len(starts) else len(text)
+        chunk = text[pos:end]
+        sol = {'id': sid}
+        m = re.search(r"codigo:\s*`([^`]+)`", chunk)
+        sol['codigo'] = m.group(1).strip() if m else ''
+        m = re.search(r"idea:\s*'((?:[^'\\]|\\.)*)'", chunk)
+        sol['idea'] = m.group(1) if m else ''
+        # truco puede ser null o un string
+        m = re.search(r"truco:\s*'((?:[^'\\]|\\.)*)'", chunk)
+        sol['truco'] = m.group(1) if m else None
+        out.append(sol)
+    return out
+
+
 # ── Parser de exercises.js ───────────────────────────────────────────────────
 def parse_exercises(text):
     """Extrae los ejercicios de exercises.js leyendo el JS como texto.
@@ -202,6 +224,10 @@ def toc_page(story):
         ('PARTE IV', 'Apéndices'),
         ('  §4.1', 'Errores comunes y cómo solucionarlos'),
         ('  §4.2', 'Tabla resumen de constructos'),
+        ('', ''),
+        ('PARTE V', 'Soluciones paso a paso de los 36 ejercicios'),
+        ('  ', '36 soluciones de referencia organizadas por los 12 grupos'),
+        ('  ', 'Cada solución incluye código pseudocódigo, "Idea" y, si aplica, "Truco"'),
     ]
     data = [[_cell(sec, C_ACCENT, bold=True), _cell(title)] for sec, title in toc]
     story.append(Table(data, colWidths=[3*cm, 13.5*cm], style=TableStyle([
@@ -1370,6 +1396,86 @@ def parte_4(story):
     ))
 
 
+# ── Parte V — Soluciones paso a paso ─────────────────────────────────────────
+def parte_5_soluciones(story, solutions, exercises):
+    """Imprime las 36 soluciones de referencia, una por ejercicio, agrupadas
+    por el grupo del ejercicio."""
+    story.append(H('PARTE V — Soluciones paso a paso de los 36 ejercicios'))
+    story.append(HR())
+    story.append(P(
+        'Esta parte está pensada como <b>libro de respuestas</b>. Si te quedas atascado en un '
+        'ejercicio, busca aquí su solución de referencia. Pero <b>úsala como último recurso</b>: '
+        'el aprendizaje real ocurre cuando peleas con el problema y descubres tú la solución, '
+        'no cuando la copias.'
+    ))
+    story.append(P(
+        'Cada solución incluye: el código pseudocódigo completo (probado: pasa los 10 casos del '
+        'grader), una <b>"Idea"</b> con el enfoque algorítmico en una o dos frases y, cuando aplica, '
+        'un <b>"Truco"</b> con una observación útil que es fácil pasar por alto.',
+        NOTE
+    ))
+
+    # Mapa id → ejercicio (para tener título y grupo)
+    by_id = {ex['id']: ex for ex in exercises}
+
+    # Agrupa por grupo
+    grupos = {}
+    for s in solutions:
+        ex = by_id.get(s['id'])
+        if not ex:
+            continue
+        grupos.setdefault(ex['grupo'], []).append((ex, s))
+
+    for grupo in sorted(grupos.keys()):
+        story.append(H(grupo, 2))
+        for ex, s in grupos[grupo]:
+            _render_solucion(story, ex, s)
+        story.append(SP(6))
+
+
+def _render_solucion(story, ex, sol):
+    """Una solución: título + bloque de código + Idea + (Truco si aplica)."""
+    bloque = []
+    bloque.append(Paragraph(
+        f'<b>{ex["titulo"]}</b>  <font color="#94a3b8" size="8">(id: {ex["id"]} · pasa 10/10 casos)</font>',
+        ParagraphStyle('solh', fontSize=11, textColor=C_ACCENT2, leading=14, spaceAfter=4)
+    ))
+    code_html = sol['codigo'].replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br/>')
+    bloque.append(Paragraph(
+        f'<font face="Courier" size="8" color="#fbbf24">{code_html}</font>',
+        ParagraphStyle('solc', leading=11, leftIndent=8,
+                       backColor=C_SURFACE, borderPadding=6, spaceAfter=4)
+    ))
+    if sol.get('idea'):
+        bloque.append(Paragraph(
+            f'<font face="Helvetica" size="9" color="#86efac"><b>Idea:</b></font> '
+            f'<font face="Helvetica" size="9" color="#e2e8f0">{_html_escape(sol["idea"])}</font>',
+            ParagraphStyle('soli', leading=12, leftIndent=8, spaceAfter=2)
+        ))
+    if sol.get('truco'):
+        bloque.append(Paragraph(
+            f'<font face="Helvetica" size="9" color="#60a5fa"><b>Truco:</b></font> '
+            f'<font face="Helvetica" size="9" color="#e2e8f0">{_html_escape(sol["truco"])}</font>',
+            ParagraphStyle('solt', leading=12, leftIndent=8, spaceAfter=2)
+        ))
+    contenido = Table([[bloque]], colWidths=[16.5 * cm])
+    contenido.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, -1), C_BG),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 10),
+        ('TOPPADDING',    (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LINEBEFORE',    (0, 0), (-1, -1), 3, C_ACCENT2),
+        ('LINEBELOW',     (0, 0), (-1, -1), 0.3, C_BORDER),
+    ]))
+    story.append(KeepTogether(contenido))
+    story.append(SP(6))
+
+
+def _html_escape(s):
+    return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
     here = Path(__file__).resolve().parent
@@ -1384,6 +1490,13 @@ def main():
     print(f"Ejercicios encontrados: {len(exercises)}")
     if len(exercises) != 36:
         print(f"⚠  esperaba 36, obtuve {len(exercises)} — revisa el parser")
+
+    solutions_path = here / 'solutions.js'
+    solutions = []
+    if solutions_path.exists():
+        sol_text = solutions_path.read_text(encoding='utf-8')
+        solutions = parse_solutions(sol_text)
+        print(f"Soluciones encontradas: {len(solutions)}")
 
     out = here / 'pseudoweb_manual.pdf'
     doc = SimpleDocTemplate(
@@ -1403,6 +1516,8 @@ def main():
     parte_2(story)
     parte_3(story, exercises)
     parte_4(story)
+    if solutions:
+        parte_5_soluciones(story, solutions, exercises)
 
     # Fondo oscuro: pintamos un rectángulo de fondo en cada página
     def on_page(canvas, doc):

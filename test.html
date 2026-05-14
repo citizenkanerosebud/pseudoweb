@@ -23,6 +23,7 @@
     <script src="flowchart.js"></script>
     <script src="share.js"></script>
     <script src="exercises.js"></script>
+    <script src="solutions.js"></script>
     <script>
         const TESTS = [
             { name: 'Hola mundo',
@@ -991,6 +992,17 @@
               baseUrl: 'http://localhost/pseudoweb/',
               expectStarts: 'http://localhost/pseudoweb/#code=' },
         ];
+
+        // ── Añade un test por cada solución de referencia (36) ───────────
+        for (const sol of (window.PseudoSolutions || [])) {
+            TESTS.push({
+                name: `Solución: ${sol.id} → 10/10`,
+                isGraderTest: true,
+                exerciseId: sol.id,
+                src: sol.codigo,
+                expectedScore: 10,
+            });
+        }
 
         function mockIO(inputs) {
             let idx = 0;
