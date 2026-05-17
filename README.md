@@ -24,13 +24,14 @@ IDE de pseudocódigo en navegador, **compatible con la sintaxis de PSeInt**, con
 
 PseudoWeb implementa un subconjunto razonable de PSeInt:
 
-| Soportado                       | No soportado (por ahora)            |
-|---------------------------------|--------------------------------------|
-| Proceso, Definir, Dimension     | Funciones definidas por el usuario   |
-| Si, Segun, Mientras, Repetir, Para | Matrices 2D                       |
-| 19 funciones built-in           | Diagrama de flujo automático         |
-| Operadores aritméticos + lógicos| Depurador paso a paso                |
-| Comentarios `//`                | Exportar a C++ y otros lenguajes     |
+| Soportado                           | No soportado (por ahora)            |
+|---------------------------------   |--------------------------------------|
+| Proceso, Definir, Dimension        | Funciones definidas por el usuario   |
+| Si, Segun, Mientras, Repetir, Para | Matrices 2D                          |
+| 19 funciones built-in              | Depurador paso a paso                |
+| Diagrama de flujo automático       | Exportar a C++ y otros lenguajes     |
+| Operadores aritméticos + lógicos   |                                      |
+| Comentarios `//`                   |                                      |
 
 Si necesitas las funcionalidades del lado derecho, descarga el **PSeInt original** en:
 https://pseint.sourceforge.io/
