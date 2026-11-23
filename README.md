@@ -4,7 +4,7 @@ IDE de pseudocódigo en navegador, **compatible con la sintaxis de PSeInt**, con
 
 ## Para empezar
 
-- **En línea**: visita `https://<usuario>.github.io/pseudoweb/`
+- **En línea**: visita `https://citizenkanerosebud.github.io/pseudoweb/`
 - **En local**: clona o descarga el repo y abre `index.html` en cualquier navegador moderno (Firefox, Chrome, Edge, Safari)
 
 ## Qué incluye
